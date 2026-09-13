@@ -1,21 +1,8 @@
-# AI Usage Disclosure — Week 01
+# AI Usage Disclosure
 
-Required by the course academic policy (Generative AI use level **D** — AI-integrated).
-You are responsible for the accuracy, testing and integrity of everything you submit,
-including anything an AI tool produced.
-
-| Tool | Version / plan | Used for | Which files it touched |
-| --- | --- | --- | --- |
-| Rocket (rocket.new) | free | Part 2 — generated app from a prompt | `week-01/ai/` |
-| | | | |
-
-**Part 1 (`week-01/manual/`) was written without any AI assistance:** yes / no
-<!-- If "no", say exactly what was assisted. An honest "no" costs far less than an undisclosed "yes". -->
-
-**Everything I submitted, I can explain and defend in class:** yes / no
-
-**Anything I accepted from the AI without fully understanding it:**
-<!-- Name the file and the part. This is a normal, expected answer in Week 1. -->
-
-Signed: <your name>
-Date:
+- **Level of AI Usage:** Level D (AI used in Part 2, manual code in Part 1).
+- **Tool Used:** Rocket (rocket.new)
+- **Scope of Use:** 
+  - Part 1: Written manually without AI tools.
+  - Part 2: Generated code via Rocket, recorded logs/screenshots, and fixed input validation defects with follow-up prompts.
+- **Verification:** Both manual and AI implementations were tested against the 4 test cases in `week-01/README.md`.
