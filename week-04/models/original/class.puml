@@ -1,0 +1,68 @@
+@startuml
+left to right direction
+
+class Student {
+    - studentId : String
+    - name : String
+    - email : String
+    --
+    + viewAvailableRooms() : List<Room>
+    + bookRoom(room : Room, start : DateTime, end : DateTime) : Booking
+    + cancelBooking(booking : Booking) : void
+}
+
+class Administrator {
+    - administratorId : String
+    - name : String
+    --
+    + blockRoom(room : Room) : void
+    + unblockRoom(room : Room) : void
+    + reviewUsage(start : DateTime, end : DateTime) : UsageReport
+}
+
+class Room {
+    - roomId : String
+    - name : String
+    - isBlocked : Boolean
+    --
+    + isAvailable(start : DateTime, end : DateTime) : Boolean
+    + block() : void
+    + unblock() : void
+}
+
+class Booking {
+    - bookingId : String
+    - startTime : DateTime
+    - endTime : DateTime
+    - status : String
+    --
+    + isValid() : Boolean
+    + overlaps(other : Booking) : Boolean
+    + cancel() : void
+    + createConfirmation() : Confirmation
+}
+
+class Confirmation {
+    - confirmationId : String
+    - createdAt : DateTime
+    - type : String
+    --
+    + generate() : void
+}
+
+class UsageReport {
+    - startDate : DateTime
+    - endDate : DateTime
+    - totalBookings : Integer
+    --
+    + generate() : void
+}
+
+Student "1" -- "0..*" Booking : makes
+Room "1" -- "0..*" Booking : has
+Administrator "1" -- "0..*" Room : manages
+Booking "1" -- "1" Confirmation : produces
+
+UsageReport ..> Booking : aggregates
+
+@enduml

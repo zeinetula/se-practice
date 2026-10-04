@@ -1,0 +1,29 @@
+@startuml
+title Book Room - Smart Campus
+
+actor Student
+participant BookingService
+participant BookingRepository
+
+Student -> BookingService : bookRoom(roomId, startTime, endTime)
+activate BookingService
+
+BookingService -> BookingService : validate start time
+BookingService -> BookingService : validate duration\n(> 0 and <= 2 hours)
+BookingService -> BookingService : validate room is not blocked
+BookingService -> BookingService : validate no overlapping\nactive booking
+
+BookingService -> BookingRepository : checkAvailability(roomId, startTime, endTime)
+BookingRepository --> BookingService : availability status
+
+alt Room is available
+    BookingService -> BookingRepository : save(Booking)
+    BookingRepository --> BookingService : booking saved
+    BookingService --> Student : booking confirmed\n(Confirmation)
+else Room is unavailable
+    BookingService --> Student : reservation rejected\n(Room unavailable)
+end
+
+deactivate BookingService
+
+@enduml

@@ -1,0 +1,46 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+class Student {
+  - studentId: String
+  - name: String
+  - email: String
+  + bookRoom(room: Room, startTime: DateTime, duration: Duration): Booking
+  + cancelBooking(booking: Booking): void
+}
+
+class Room {
+  - roomId: String
+  - roomName: String
+  - capacity: int
+  - isBlocked: boolean
+  + checkAvailability(slot: TimeSlot): boolean
+  + setBlockedStatus(status: boolean): void
+}
+
+class Booking {
+  - bookingId: String
+  - startTime: DateTime
+  - endTime: DateTime
+  - status: String
+  + cancel(): void
+}
+
+'why: A student creates 0 to many bookings, each booking belongs to exactly one student
+Student "1" -- "0..*" Booking
+
+'why: A room can have 0 to many bookings over time, each booking is for exactly one room
+Room "1" -- "0..*" Booking
+
+note bottom of Booking
+  Business Rules:
+  - R1: startTime must be in the future, duration > 0 and <= 2 hours.
+  - R3: Active bookings for the same room cannot overlap.
+end note
+
+note bottom of Room
+  Business Rules:
+  - R4: A blocked room cannot accept new bookings.
+end note
+
+@enduml
