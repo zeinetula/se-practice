@@ -1,0 +1,38 @@
+@startuml
+autonumber
+
+actor "Student" as student
+participant "BookingService" as service
+participant "BookingRepository" as repo
+
+student -> service : createBooking(roomId, startTime, duration)
+activate service
+
+'why: Validate business rule R1 (start time in future, duration <= 2 hours)
+service -> service : validateBookingTime(startTime, duration)
+
+'why: Validate business rule R4 (check if room is blocked)
+service -> repo : isRoomBlocked(roomId)
+activate repo
+repo --> service : roomBlockedStatus
+deactivate repo
+
+'why: Validate business rule R3 (check for overlapping bookings)
+service -> repo : hasOverlap(roomId, startTime, duration)
+activate repo
+repo --> service : isOverlapping
+deactivate repo
+
+alt Room Available and Valid Rules
+  service -> repo : saveBooking(bookingDetails)
+  activate repo
+  repo --> service : bookingConfirmation
+  deactivate repo
+  
+  service --> student : Booking Confirmed (Confirmation Sent)
+else Room Blocked, Overlapping, or Invalid Time
+  service --> student : Booking Rejected (Error Message)
+end
+
+deactivate service
+@enduml

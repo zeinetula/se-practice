@@ -1,0 +1,23 @@
+# Submission declaration for Practice #03
+name: Ayan
+group: Undergraduate (SE)
+assistant: ChatGPT
+exact_model: GPT-4o
+
+open_question_decisions:
+  r2_two_hours_allowed: true
+  r3_back_to_back_is_overlap: false
+
+checker_results:
+  check_requirements: PASS
+  validate_submission: PASS
+
+traceability_gaps:
+  - "UC-03 has user story US-03 but acceptance criteria were not generated in the 3-story subset."
+  - "UC-05 has user story US-07 but acceptance criteria were not generated in the 3-story subset."
+  - "UC-06 is auto-triggered via UC-02 and UC-03 and lacks direct actor triggers."
+
+review_findings:
+  - "US-01: AI initially missed specifying whether blocked rooms appear in the availability list."
+  - "AC-02-02: AI needed explicit clarification on back-to-back slot boundaries vs actual overlaps."
+  - "UC-06: AI attempted to connect an actor directly to Send Confirmation instead of keeping it system-triggered."
