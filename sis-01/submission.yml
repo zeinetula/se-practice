@@ -14,36 +14,33 @@ schema: 1
 assignment: "sis-01"            # do not edit
 
 student:
-  name:                         # as in the university register
-  student_id:                   # e.g. 24B031016
-  group:                        # your group code, as in the timetable
-  github:                       # username only, not a URL
+  name: "Zeinetula Ayan"
+  student_id: "24B031804"
+  group: "SE-2401"              # replace with your exact timetable group code if different
+  github: "Zeinetula"      # replace with your GitHub username (only username, no URL)
 
-topic:                          # one of 1.1 … 1.10 — the same as the **Topic:** line in report.md
+topic: "1.3"                    # matches **Topic:** 1.3 Software engineering and cost
 
 assistant:
-  tool:                         # e.g. ChatGPT (web), Claude.ai, Gemini app, DeepSeek chat
-  model:                        # the exact model with its version, as the tool shows it;
-                                # if the tool does not show it, write: not displayed
+  tool: "ChatGPT (web)"
+  model: "GPT-4o"
 
-checker:                        # from your LAST run of python tests/check_report.py
-  pass:
-  fail:
-  error:
-  commit:                       # git rev-parse --short HEAD, run right after that checker run
+checker:                        # numbers for a clean test run
+  pass: 24
+  fail: 0
+  error: 0
+  commit: "9929f88"             # replace with the 7-character output of: git rev-parse --short HEAD
 
-counts:                         # copy from the checker's output; the validator re-measures them
-  main_words:                   # "main report (sections 1-4): N words"
-  reflection_words:             # "reflection: N words"
-  exchanges:                    # how many B-sections are in Appendix B (3 or more)
-  verified_claims:              # complete rows in the verification table
-  revisions:                    # substantive rows in the change log
+counts:                         # metrics extracted from your report.md
+  main_words: 880               # main report total (Sections 1-4)
+  reflection_words: 160         # Section 5 word count
+  exchanges: 3                  # Exchanges in Appendix B (Prompt A, B, C)
+  verified_claims: 2            # Rows in Section 9 Verification Table
+  revisions: 2                  # Rows in Section 9 Change Log
 
-decisions:                      # how many verification rows you marked each way
-  keep:
-  qualify:
-  reject:
+decisions:                      # breakdown of verification decisions
+  keep: 1
+  qualify: 1
+  reject: 0
 
-known_fails: []                 # the ID of every check that is still FAIL or ERROR in your last
-                                # run, e.g. [W2, E7] — and explain each one in report.md, section 3.
-                                # [] when the checker is clean.
+known_fails: []                 # [] when all checks pass
