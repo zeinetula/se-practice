@@ -1,0 +1,25 @@
+schema: 1
+assignment: "week-05"
+
+student:
+  name: "Zeinetula Ayan"
+  student_id: "24B031804"
+  group: "SE-2401"
+  github: "твой_github_username"
+
+assistant:
+  tool: "ChatGPT (web)"
+  model: "GPT-4o"
+
+checker:
+  pass: 32
+  fail: 0
+  error: 0
+  commit: "7e30c36"
+
+counts:
+  tests_written: 12
+  mutants_killed: 10
+  mutants_survived: 0
+
+known_fails: []
