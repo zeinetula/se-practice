@@ -61,24 +61,19 @@ prompt: yes / no
 **Bolt's list of the files/components it created, pasted unedited:**
 
 ```text
-How it works for a user:
+### Section 4: Test Results
 
-Pick a room from the list on the left (each shows building, capacity, blocked/open status, and a mini timeline of existing bookings with a "now" marker).
-Enter a start and end time (HH:MM) on the right.
-The page shows a clear Available or Unavailable decision with a plain-language reason, without changing any existing booking data.
-All six acceptance criteria are handled:
-
-AC1: validates 0 < start < end ≤ 1440 and that start is after the current time.
-AC2: rejects bookings longer than 120 minutes.
-AC3: blocked rooms are always unavailable.
-AC4: overlaps rejected; touching endpoints allowed.
-AC5: decision is read-only — existing bookings are never modified.
-AC6: responsive two-column layout that stacks on mobile, with understandable validation feedback.
-Main files/components created:
-
-src/lib/rooms.ts — fictional sample room/booking data and types.
-src/lib/availability.ts — the decision logic (all ACs) plus time formatting/parsing.
-src/App.tsx — the full single-page UI: Header, RoomList, Timeline, Checker, TimeField, DecisionCard, and Rules sections.
+| # | Case | Set up and request | Expected | v1 | Final |
+|---|---|---|---|---|---|
+| T1 | Touching | 11:00-12:00 | Available | Available | Available |
+| T2 | Overlap | 10:30-11:30 | Unavailable | Unavailable | Unavailable |
+| T3 | Blocked | 11:00-12:00, room blocked | Unavailable | Unavailable | Unavailable |
+| T4 | Exactly 2 hours | 12:00-14:00 | Available | Available | Available |
+| T5 | Over 2 hours | 12:00-14:01 | Unavailable | Unavailable | Unavailable |
+| T6 | Starts now | 09:00-09:30, current time 09:00 | Unavailable | Unavailable | Unavailable |
+| T7 | Reversed times | 12:00-11:00 and the page says why | Unavailable | Unavailable | Unavailable |
+| T8 | Same check twice | T1, then T1 again without reloading | Available | Available | Available |
+| T9 | Narrow screen | T1 at about 375 px wide | Available | Available | Available |
 ```text
 ```
 
