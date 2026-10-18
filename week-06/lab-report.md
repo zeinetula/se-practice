@@ -61,16 +61,24 @@ prompt: yes / no
 **Bolt's list of the files/components it created, pasted unedited:**
 
 ```text
-(paste here)
-```
+How it works for a user:
 
-**What v1 does — one line per thing that works, or visibly does not:**
+Pick a room from the list on the left (each shows building, capacity, blocked/open status, and a mini timeline of existing bookings with a "now" marker).
+Enter a start and end time (HH:MM) on the right.
+The page shows a clear Available or Unavailable decision with a plain-language reason, without changing any existing booking data.
+All six acceptance criteria are handled:
 
--
+AC1: validates 0 < start < end ≤ 1440 and that start is after the current time.
+AC2: rejects bookings longer than 120 minutes.
+AC3: blocked rooms are always unavailable.
+AC4: overlaps rejected; touching endpoints allowed.
+AC5: decision is read-only — existing bookings are never modified.
+AC6: responsive two-column layout that stacks on mobile, with understandable validation feedback.
+Main files/components created:
 
-**Repair prompt** (only if the first build did not run — the deck allows one, then the result is
-v1). Leave empty if you did not need it:
-
+src/lib/rooms.ts — fictional sample room/booking data and types.
+src/lib/availability.ts — the decision logic (all ACs) plus time formatting/parsing.
+src/App.tsx — the full single-page UI: Header, RoomList, Timeline, Checker, TimeField, DecisionCard, and Rules sections.
 ```text
 ```
 
