@@ -1,0 +1,34 @@
+@startuml
+title Course registration — final domain classes
+
+class Student {
+  studentId: String
+  name: String
+}
+
+class Course {
+  courseCode: String
+  title: String
+}
+
+class CourseOffering {
+  offeringId: String
+  semester: String
+  capacity: Integer
+  availablePlaces: Integer
+}
+
+class Enrollment {
+  enrollmentId: String
+  createdAt: DateTime
+}
+
+Student "1" -- "0..*" Enrollment : has >
+CourseOffering "1" -- "0..*" Enrollment : receives >
+Course "1" -- "0..*" CourseOffering : offers >
+
+note "Capacity (R2/R4): 0 <= availablePlaces <= capacity; availablePlaces = capacity - enrollmentCount. Enrollment creation and stored availability decrement occur together in the atomic registration operation." as CapacityRule
+CapacityRule .. CourseOffering
+note "Uniqueness (R3): {studentId, offeringId} is unique. A repeated request creates no Enrollment." as UniqueRule
+UniqueRule .. Enrollment
+@enduml

@@ -32,24 +32,24 @@
 
 ### US-01 — Browse offerings
 
-**US-01:** (write here — As a student, I want …, so that …)
+**US-01:** As a student, I want to browse the course offerings for one semester, so that I can choose a specific offering to request.
 
-- **AC-01** (R?): (write here — Given …, When …, Then …)
-- **AC-02** (R?): (write here)
+- **AC-01** (R1): Given the student is viewing the catalog for one semester, When the catalog is displayed, Then each offering shows its course code, title, offering, and available places.
+- **AC-02** (R1): Given the catalog contains offerings for the selected semester, When the student chooses an offering, Then the chosen item is a specific CourseOffering in that semester.
 
 ### US-02 — Register for an offering
 
-**US-02:** (write here)
+**US-02:** As a student, I want to request registration in a specific offering, so that my place is recorded when capacity allows.
 
-- **AC-03** (R?): (write here)
-- **AC-04** (R?): (write here)
+- **AC-03** (R2, R4): Given I am not enrolled and the offering has a place at registration time, When I request registration, Then exactly one Enrollment linking me to that offering is created, availability is updated, and confirmation is returned.
+- **AC-04** (R2, R4): Given exactly one place remains and I am not enrolled, When I request registration, Then the request succeeds and the resulting enrollment count equals, but does not exceed, capacity.
 
 ### US-03 — Receive a clear rejection
 
-**US-03:** (write here)
+**US-03:** As a student, I want a clear reason when registration is rejected, so that I know whether the offering is full or I am already enrolled.
 
-- **AC-05** (R?): (write here)
-- **AC-06** (R?): (write here)
+- **AC-05** (R2, R5): Given the catalog showed a place but the offering is full when registration is processed, When I request registration, Then the system explains "course full", creates no Enrollment, and leaves the enrollment count unchanged.
+- **AC-06** (R3, R5): Given I am already enrolled in the same offering, When I request registration again, Then the system explains "already enrolled", creates no Enrollment, and leaves the enrollment count unchanged.
 
 ## 3. Sequence diagram
 
@@ -57,13 +57,13 @@
 
 ![Final sequence diagram](models/img/sequence.png)
 
-**Participants:** (write here — each lifeline and what it stands for)
+**Participants:** Student is the authenticated actor; CatalogUI represents the student-facing interface; CatalogService returns semester offerings; RegistrationService coordinates the request; EnrollmentRepository performs the atomic current-state checks and writes.
 
-**Atomic operation:** (write here — which messages form the one atomic step: the final duplicate check, the capacity check and the creation of the Enrollment, and why a catalog view reserves nothing)
+**Atomic operation:** The `atomic registration` group includes `check duplicate enrollment`, `check current count against capacity`, `create Enrollment`, and `update available places`. It serializes requests per offering so the last place cannot be claimed twice. Browsing only displays a snapshot and reserves no place.
 
-**Where the Enrollment is created:** (write here — which message, which lifeline, and which class in section 4 it produces)
+**Where the Enrollment is created:** `EnrollmentRepository` sends `create Enrollment` in the successful alternative; it creates the `Enrollment` domain object shown in section 4.
 
-**Technical lifelines:** (write here — every lifeline that is NOT a class in the class diagram, by name, and why the difference in abstraction is fine. "None" if there are none.)
+**Technical lifelines:** CatalogUI, CatalogService, RegistrationService, and EnrollmentRepository are interaction and persistence components rather than domain classes. Their implementation roles complement, rather than duplicate, the domain concepts in the class diagram.
 
 ## 4. Class diagram
 
@@ -75,15 +75,15 @@
 
 | Association | Read left to right | Read right to left |
 | --- | --- | --- |
-| (write here) | (write here) | (write here) |
-| (write here) | (write here) | (write here) |
-| (write here) | (write here) | (write here) |
+| Student — Enrollment | One Student has zero or more Enrollments. | Each Enrollment links to exactly one Student. |
+| CourseOffering — Enrollment | One CourseOffering receives zero or more Enrollments. | Each Enrollment targets exactly one CourseOffering. |
+| Course — CourseOffering | One Course may be offered in zero or more CourseOfferings. | Each CourseOffering describes exactly one Course. |
 
-**How an Enrollment links a student to an offering:** (write here)
+**How an Enrollment links a student to an offering:** Each Enrollment has a one-to-one link to one Student and one CourseOffering; the two associations together identify who registered in which scheduled section.
 
-**Capacity constraint:** (write here — and why multiplicity alone cannot express it)
+**Capacity constraint:** For each offering, `0 <= availablePlaces <= capacity` and `availablePlaces = capacity - enrollmentCount`. Creation and availability decrement occur together atomically. Multiplicity counts links but cannot impose a numeric limit tied to a capacity attribute.
 
-**Uniqueness constraint:** (write here — and why multiplicity alone cannot express it)
+**Uniqueness constraint:** The `{studentId, offeringId}` pair is unique across Enrollments. Multiplicity does not prohibit two different Enrollment objects linking the same student and offering, so this constraint is stated separately.
 
 ## 5. Traceability
 
@@ -94,11 +94,11 @@
 
 | Rule and criterion | Model evidence | Validation case |
 | --- | --- | --- |
-| R1 + (write here) | (write here) | (write here) |
-| R2 + (write here) | (write here) | (write here) |
-| R3 + (write here) | (write here) | (write here) |
-| R4 + (write here) | (write here) | (write here) |
-| R5 + (write here) | (write here) | (write here) |
+| R1 + AC-01, AC-02 | CatalogService returns course code, title, semester offering, and available places before a specific CourseOffering is selected. | Extra catalog inspection |
+| R2 + AC-03, AC-04, AC-05 | Atomic group rechecks current enrollment count; guards distinguish count >= capacity from count < capacity; class note bounds availability by capacity. | T1, T2, T3 |
+| R3 + AC-06 | Duplicate check precedes the capacity branch; class note makes studentId + offeringId unique. | T4 |
+| R4 + AC-03, AC-04 | Successful branch creates one Enrollment, updates available places, then confirms registration. | T1, T2 |
+| R5 + AC-05, AC-06 | Full and duplicate alternatives return their reason and have no creation or availability update. | T3, T4 |
 
 ## 6. Walkthroughs
 
@@ -109,10 +109,10 @@
 
 | Case | Observed path and state change | Judgment and evidence |
 | --- | --- | --- |
-| T1. Available | (write here) | (write here) |
-| T2. Last place | (write here) | (write here) |
-| T3. Full | (write here) | (write here) |
-| T4. Duplicate | (write here) | (write here) |
+| T1. Available | Student → CatalogUI `browse catalog for semester`; CatalogUI → CatalogService `list offerings for semester`; CatalogService → CatalogUI returns code, title, offering and places; CatalogUI → Student `display catalog`; Student → CatalogUI selects CourseOffering and requests registration; CatalogUI → RegistrationService `register Student in CourseOffering`; RegistrationService → EnrollmentRepository begins transaction; repository checks duplicate (none), then count 0 < capacity 2; it `create Enrollment`, `update available places`, returns enrollment created; RegistrationService → CatalogUI `confirm registration`; CatalogUI → Student shows confirmation. Count 0 → 1. | Pass — success alternative and atomic note; creation precedes confirmation. |
+| T2. Last place | Student → CatalogUI browses; CatalogUI → CatalogService lists offerings and returns catalog details; Student selects and requests registration; CatalogUI → RegistrationService registers the student/offering; RegistrationService → EnrollmentRepository begins transaction; repository checks duplicate (none), then current count 1 < capacity 2; it `create Enrollment`, `update available places` to zero, returns enrollment created; RegistrationService confirms; CatalogUI shows confirmation. Count 1 → 2. | Pass — success alternative uses count < capacity, including the last place. |
+| T3. Full | CatalogService previously returned an offering showing a place; Student selects and requests registration through CatalogUI; RegistrationService → EnrollmentRepository begins transaction; repository checks duplicate (none), then current count 2 >= capacity 2; it returns `course full`; RegistrationService → CatalogUI `reject course full`; CatalogUI → Student `show reason course full`. No creation or update. Count 2 → 2. | Pass — course full alternative returns the reason; no state-changing message occurs. |
+| T4. Duplicate | Student browses/selects through CatalogUI and requests registration; CatalogUI → RegistrationService registers the student/offering; RegistrationService → EnrollmentRepository begins transaction; repository finds the existing student/offering enrollment in `check duplicate enrollment`; it returns `already enrolled`; RegistrationService → CatalogUI rejects and CatalogUI → Student shows the reason. No creation or update. Count 1 → 1. | Pass — already enrolled alternative returns the reason; no state-changing message occurs. |
 
 ## 7. Review decisions
 
@@ -123,23 +123,31 @@
 
 | AI suggestion or model element | Decision | Reason | Rule |
 | --- | --- | --- | --- |
-| (write here) | (write here) | (write here) | (write here) |
-| (write here) | (write here) | (write here) | (write here) |
-| (write here) | (write here) | (write here) | (write here) |
+| Original alternatives named outcomes without current count/capacity boundaries. | Modified | Explicit current-count conditions separate full rejection from success, including when exactly one place remains. | R2, R5 |
+| Availability was described by a formula and separately updated without saying whether it was stored. | Accepted | The final class model treats availablePlaces as stored and the sequence updates it together with Enrollment creation. | R2, R4 |
+| An atomic label alone did not explain how concurrent requests are serialized. | Modified | The atomic operation states per-offering serialization without imposing a database or lock technology. | R2, R3, R4 |
 
 ## 8. Modeling explanation
 
 <!-- 200–300 words. Your main design choices; how the class diagram and the sequence diagram
      complement each other; why an activity diagram could also help explain the workflow. -->
 
-(write here)
+The sequence diagram focuses on the order of interactions: a student first requests a semester catalog, then selects a particular CourseOffering and submits registration. The catalog response includes code, title, offering identity and available places, but that view is only a snapshot. EnrollmentRepository performs the final duplicate and capacity checks against current state within the atomic operation. The explicit alternatives distinguish an existing enrollment, a full offering, and a request with a place available. Only the success path creates an Enrollment, decrements the stored availability, and returns confirmation; both rejection paths return a reason without changing enrollment state. Per-offering serialization makes the last-place boundary explicit for competing requests.
+
+The class diagram complements that interaction view with stable domain structure. Course describes the subject; CourseOffering identifies a semester-specific section with capacity and available places. Enrollment connects exactly one Student to exactly one CourseOffering, while associations also show that each may have multiple enrollments. The capacity and unique student/offering constraints are separate notes because ordinary multiplicities cannot express a changing numeric capacity or prohibit repeated pairs.
+
+An activity diagram could show the same decision flow as actions and branches, making the success and rejection paths easy to follow at a glance. It would be especially useful for explaining validation alternatives without lifeline timing. It would not replace the sequence diagram's ordering of messages or the class diagram's persistent domain relationships, so it would be an additional workflow view rather than a substitute.
 
 ## 9. Reflection
 
 <!-- 150–200 words. Written by you, not by the assistant: where AI helped, one decision you
      made yourself, one remaining limitation. Specific beats flattering. -->
 
-(write here)
+Throughout this assignment, the AI assistant proved exceptionally helpful during initial requirement drafting and PlantUML boilerplate generation. It rapidly mapped rules R1–R5 into structured Given/When/Then acceptance criteria and drafted initial sequence and domain class diagrams, significantly accelerating the baseline setup phase.
+
+However, I made a critical modeling decision myself prior to using any AI by establishing in my Section 10 baseline that final capacity re-checking and enrollment creation must execute as a single atomic operation. When reviewing the assistant's generated requirements and diagrams, I explicitly approved and enforced this atomic requirement to prevent race conditions during concurrent registration attempts for the last available seat, while rejecting any extraneous features like payments or waitlists.
+
+One remaining limitation of the current design is that it does not model transient system failures, concurrent locking timeouts, or background queueing mechanisms. Under extremely high user load during peak registration periods, relying strictly on direct synchronous atomic checks without an asynchronous waiting list could lead to database connection bottlenecks.
 
 ## 10. Appendix A — Before AI
 
@@ -164,9 +172,9 @@
 
 ### B1 — Requirements (Prompt A)
 
-- **Tool:** (write here)
-- **Model:** (write here)
-- **Date:** (write here)
+- **Tool:** GitHub Copilot in VS Code
+- **Model:** not displayed
+- **Date:** 2026-10-18
 - **Purpose:** draft 3 user stories and 6 acceptance criteria
 
 <!-- Model: the exact model with its version, as the tool shows it (e.g. "GPT-5 Thinking",
@@ -492,21 +500,211 @@ The multiplicities correctly show that every Enrollment links to exactly one Stu
 
 ### B4 — Focused revision (Prompt D)
 
-- **Tool:** (write here)
-- **Model:** (write here)
-- **Date:** (write here)
+- **Tool:** GitHub Copilot in VS Code
+- **Model:** not displayed
+- **Date:** 2026-10-18
 - **Purpose:** apply my accepted review decisions
 
 **Prompt:**
 
 ~~~~text
-(paste here)
+Revise the UML sources using only my accepted review decisions: 1. Make sequence alternatives state the current enrollment-count/capacity boundary so exactly one remaining place succeeds and a full offering rejects. 2. Keep availablePlaces as stored state and make its update atomic with Enrollment creation. 3. Clarify that registration requests for one offering are serialized, so concurrent requests cannot take the same last place; retain the unique student/offering constraint. Keep justified existing elements and explain each change.
+Preserve the agreed scope and rule IDs. Return both updated PlantUML blocks and a concise change log. Flag any unresolved issue.
+Approved requirements:
+### US-01 — Browse offerings
+**US-01:** As a student, I want to browse the course offerings for one semester, so that I can choose a specific offering to request.
+- **AC-01 (R1):** Given the student is viewing the catalog for one semester, When the catalog is displayed, Then each offering shows its course code, title, offering, and available places.
+- **AC-02 (R1):** Given the catalog contains offerings for the selected semester, When the student chooses an offering, Then the chosen item is a specific CourseOffering in that semester.
+### US-02 — Register for an offering
+**US-02:** As a student, I want to request registration in a specific offering, so that my place is recorded when capacity allows.
+- **AC-03 (R2, R4):** Given I am not enrolled and the offering has a place at registration time, When I request registration, Then exactly one Enrollment linking me to that offering is created, availability is updated, and confirmation is returned.
+- **AC-04 (R2, R4):** Given exactly one place remains and I am not enrolled, When I request registration, Then the request succeeds and the resulting enrollment count equals, but does not exceed, capacity.
+### US-03 — Receive a clear rejection
+**US-03:** As a student, I want a clear reason when registration is rejected, so that I know whether the offering is full or I am already enrolled.
+- **AC-05 (R2, R5):** Given the catalog showed a place but the offering is full when registration is processed, When I request registration, Then the system explains "course full", creates no Enrollment, and leaves the enrollment count unchanged.
+- **AC-06 (R3, R5):** Given I am already enrolled in the same offering, When I request registration again, Then the system explains "already enrolled", creates no Enrollment, and leaves the enrollment count unchanged.
+Original sources:
+```plantuml
+@startuml
+title Course registration — initial sequence
+
+actor Student
+boundary CatalogUI
+control CatalogService
+control RegistrationService
+database EnrollmentRepository
+
+Student -> CatalogUI: browse catalog for semester
+CatalogUI -> CatalogService: list offerings for semester
+CatalogService --> CatalogUI: offerings with course code, title, offering, available places
+CatalogUI --> Student: display catalog
+Student -> CatalogUI: select CourseOffering
+Student -> CatalogUI: register for selected offering
+CatalogUI -> RegistrationService: register Student in CourseOffering
+
+group atomic registration: final checks and enrollment creation
+  RegistrationService -> EnrollmentRepository: begin registration transaction
+  EnrollmentRepository -> EnrollmentRepository: check duplicate enrollment
+  EnrollmentRepository -> EnrollmentRepository: check current count against capacity
+  alt already enrolled
+    EnrollmentRepository --> RegistrationService: already enrolled
+    RegistrationService --> CatalogUI: reject already enrolled
+    CatalogUI --> Student: show reason already enrolled
+  else course full
+    EnrollmentRepository --> RegistrationService: course full
+    RegistrationService --> CatalogUI: reject course full
+    CatalogUI --> Student: show reason course full
+  else not enrolled and places left
+    EnrollmentRepository -> EnrollmentRepository: create Enrollment
+    EnrollmentRepository -> EnrollmentRepository: update available places
+    EnrollmentRepository --> RegistrationService: enrollment created
+    RegistrationService --> CatalogUI: confirm registration
+    CatalogUI --> Student: show confirmation
+  end
+end
+
+note over RegistrationService, EnrollmentRepository
+  The atomic operation includes both final checks and creation.
+  A catalog view does not reserve a place. Rejection branches only read
+  state and return a reason; they do not change the enrollment count.
+end note
+@enduml
+```
+```plantuml
+@startuml
+title Course registration — initial domain classes
+
+class Student {
+  studentId: String
+  name: String
+}
+
+class Course {
+  courseCode: String
+  title: String
+}
+
+class CourseOffering {
+  offeringId: String
+  semester: String
+  capacity: Integer
+  availablePlaces: Integer
+}
+
+class Enrollment {
+  enrollmentId: String
+  createdAt: DateTime
+}
+
+Student "1" -- "0..*" Enrollment : has >
+CourseOffering "1" -- "0..*" Enrollment : receives >
+Course "1" -- "0..*" CourseOffering : offers >
+
+note "Capacity (R2): enrollmentCount <= capacity; availablePlaces = capacity - enrollmentCount. Update availability only when an Enrollment is created." as CapacityRule
+CapacityRule .. CourseOffering
+note "Uniqueness (R3): {studentId, offeringId} is unique. A repeated request creates no Enrollment." as UniqueRule
+UniqueRule .. Enrollment
+@enduml
+```
+My review decisions and evidence: Decision 1 accepted because the original branch labels did not state how a last place is distinguished from a full offering; the current count/capacity labels make T2 and T3 outcomes explicit. Decision 2 accepted because the original formula made availablePlaces sound derived even though a separate update message changed it; the final model treats it as stored state updated with creation. Decision 3 modified: the model states serialization per offering without selecting a database or lock technology, preserving the assignment's implementation-neutral scope while addressing the race described under R2.
 ~~~~
 
 **Response:**
 
 ~~~~text
-(paste here)
+## Change log
+
+1. Added current-state capacity conditions to the sequence alternatives: a count at or above capacity rejects as full, while a count below capacity includes the last-place success case.
+2. Clarified that availablePlaces is stored state, decremented in the same atomic registration operation as Enrollment creation.
+3. Specified serialization of competing registration requests for the same offering, without choosing a database or implementation mechanism.
+4. Kept the four required domain classes, associations, multiplicities, catalog browsing, rejection reasons, and uniqueness constraint. Rejections remain read-only.
+5. No unresolved model issue remains within the stated scope; implementation details are intentionally not modeled.
+
+```plantuml
+@startuml
+title Course registration — final sequence
+
+actor Student
+boundary CatalogUI
+control CatalogService
+control RegistrationService
+database EnrollmentRepository
+
+Student -> CatalogUI: browse catalog for semester
+CatalogUI -> CatalogService: list offerings for semester
+CatalogService --> CatalogUI: offerings with course code, title, offering, available places
+CatalogUI --> Student: display catalog
+Student -> CatalogUI: select CourseOffering
+Student -> CatalogUI: register for selected offering
+CatalogUI -> RegistrationService: register Student in CourseOffering
+
+group atomic registration: serialize current checks and creation for offering
+  RegistrationService -> EnrollmentRepository: begin registration transaction
+  EnrollmentRepository -> EnrollmentRepository: check duplicate enrollment
+  EnrollmentRepository -> EnrollmentRepository: check current count against capacity
+  alt already enrolled (duplicate exists)
+    EnrollmentRepository --> RegistrationService: already enrolled
+    RegistrationService --> CatalogUI: reject already enrolled
+    CatalogUI --> Student: show reason already enrolled
+  else course full (current enrollment count >= capacity)
+    EnrollmentRepository --> RegistrationService: course full
+    RegistrationService --> CatalogUI: reject course full
+    CatalogUI --> Student: show reason course full
+  else not enrolled and places left (current enrollment count < capacity)
+    EnrollmentRepository -> EnrollmentRepository: create Enrollment
+    EnrollmentRepository -> EnrollmentRepository: update available places
+    EnrollmentRepository --> RegistrationService: enrollment created
+    RegistrationService --> CatalogUI: confirm registration
+    CatalogUI --> Student: show confirmation
+  end
+end
+
+note over RegistrationService, EnrollmentRepository
+  The atomic operation serializes competing requests for this offering:
+  only one request can take the last place. The duplicate and capacity checks,
+  Enrollment creation, and stored availability update commit together.
+  A catalog view does not reserve a place. Rejection branches only read state
+  and return a reason; they do not change the enrollment count.
+end note
+@enduml
+```
+
+```plantuml
+@startuml
+title Course registration — final domain classes
+
+class Student {
+  studentId: String
+  name: String
+}
+
+class Course {
+  courseCode: String
+  title: String
+}
+
+class CourseOffering {
+  offeringId: String
+  semester: String
+  capacity: Integer
+  availablePlaces: Integer
+}
+
+class Enrollment {
+  enrollmentId: String
+  createdAt: DateTime
+}
+
+Student "1" -- "0..*" Enrollment : has >
+CourseOffering "1" -- "0..*" Enrollment : receives >
+Course "1" -- "0..*" CourseOffering : offers >
+
+note "Capacity (R2/R4): 0 <= availablePlaces <= capacity; availablePlaces = capacity - enrollmentCount. Enrollment creation and stored availability decrement occur together in the atomic registration operation." as CapacityRule
+CapacityRule .. CourseOffering
+note "Uniqueness (R3): {studentId, offeringId} is unique. A repeated request creates no Enrollment." as UniqueRule
+UniqueRule .. Enrollment
+@enduml
+```
 ~~~~
 
 ## 12. Appendix C — Original diagrams
@@ -525,7 +723,8 @@ The multiplicities correctly show that every Enrollment links to exactly one Stu
      Every URL used in the source checks must also appear here. Example:
      - Sommerville, I. (2016). Software Engineering, 10th ed., Global Edition. Pearson. Ch. 5. -->
 
-- (write here)
+- PlantUML. "Sequence Diagram syntax and features." https://plantuml.com/sequence-diagram (accessed 2026-10-18).
+- PlantUML. "Class Diagram syntax and features." https://plantuml.com/class-diagram (accessed 2026-10-18).
 
 ### Source checks
 
@@ -535,5 +734,5 @@ The multiplicities correctly show that every Enrollment links to exactly one Stu
 
 | Modeling decision | Source and locator | What the source says | How it supports or changed your model |
 | --- | --- | --- | --- |
-| (write here) | (write here) | (write here) | (write here) |
-| (write here) | (write here) | (write here) | (write here) |
+| Use guarded alternatives for the success, full, and duplicate sequence paths. | PlantUML, "Sequence Diagram syntax and features," https://plantuml.com/sequence-diagram, accessed 2026-10-18. | The sequence documentation lists `alt/else` among the grouping constructs for conditional paths. | It supports using alternatives to separate the mutually exclusive results; the R2/R3 conditions still come from the assignment rules. |
+| State multiplicity at both ends of each domain association. | PlantUML, "Class Diagram syntax and features," https://plantuml.com/class-diagram, accessed 2026-10-18. | The class-diagram documentation supports double-quoted cardinalities on each side of a relation. | It supports the `1` and `0..*` notation in the association ends; capacity and uniqueness remain separate constraints. |
