@@ -1,0 +1,44 @@
+@startuml
+title Course registration — initial sequence
+
+actor Student
+boundary CatalogUI
+control CatalogService
+control RegistrationService
+database EnrollmentRepository
+
+Student -> CatalogUI: browse catalog for semester
+CatalogUI -> CatalogService: list offerings for semester
+CatalogService --> CatalogUI: offerings with course code, title, offering, available places
+CatalogUI --> Student: display catalog
+Student -> CatalogUI: select CourseOffering
+Student -> CatalogUI: register for selected offering
+CatalogUI -> RegistrationService: register Student in CourseOffering
+
+group atomic registration: final checks and enrollment creation
+  RegistrationService -> EnrollmentRepository: begin registration transaction
+  EnrollmentRepository -> EnrollmentRepository: check duplicate enrollment
+  EnrollmentRepository -> EnrollmentRepository: check current count against capacity
+  alt already enrolled
+    EnrollmentRepository --> RegistrationService: already enrolled
+    RegistrationService --> CatalogUI: reject already enrolled
+    CatalogUI --> Student: show reason already enrolled
+  else course full
+    EnrollmentRepository --> RegistrationService: course full
+    RegistrationService --> CatalogUI: reject course full
+    CatalogUI --> Student: show reason course full
+  else not enrolled and places left
+    EnrollmentRepository -> EnrollmentRepository: create Enrollment
+    EnrollmentRepository -> EnrollmentRepository: update available places
+    EnrollmentRepository --> RegistrationService: enrollment created
+    RegistrationService --> CatalogUI: confirm registration
+    CatalogUI --> Student: show confirmation
+  end
+end
+
+note over RegistrationService, EnrollmentRepository
+  The atomic operation includes both final checks and creation.
+  A catalog view does not reserve a place. Rejection branches only read
+  state and return a reason; they do not change the enrollment count.
+end note
+@enduml
