@@ -1,25 +1,35 @@
-import { Booking, Room } from './rooms';
+import { Booking } from './rooms';
+import { MINUTES_PER_DAY, MAX_BOOKING_MINUTES } from '../booking';
 
-export const MINUTES_PER_DAY = 1440;
-export const MAX_BOOKING_MINUTES = 120;
+export { MINUTES_PER_DAY, MAX_BOOKING_MINUTES };
+
 
 export type Decision =
   | { status: 'available'; message: string }
   | { status: 'unavailable'; message: string; reason: string };
 
 export interface CheckInput {
-  room: Room;
   start: number;
   end: number;
   now: number; // current time in minutes from midnight
+  blocked: boolean;
+  bookings: Booking[];
 }
 
-// AC1: 0 < start < end <= 1440 and start must be after the current time.
-// AC2: duration must not exceed 120 minutes.
-// AC3: room must not be blocked.
-// AC4: must not overlap an existing booking; touching endpoints allowed.
-// AC5: never mutates existing booking data.
-export function checkAvailability({ room, start, end, now }: CheckInput): Decision {
+// The decision itself is made by canBook() in src/booking.ts and passed in as
+// `available`. This function only writes the message the page shows, so the
+// wording from Week 06 is kept. It never changes the bookings (AC5).
+export function describeDecision(
+  available: boolean,
+  { start, end, now, blocked, bookings }: CheckInput,
+): Decision {
+  const duration = end - start;
+  if (available) {
+    return {
+      status: 'available',
+      message: `Available for ${duration} min (${formatTime(start)}–${formatTime(end)}).`,
+    };
+  }
   if (!(start > 0 && end > start && end <= MINUTES_PER_DAY)) {
     return {
       status: 'unavailable',
@@ -28,7 +38,6 @@ export function checkAvailability({ room, start, end, now }: CheckInput): Decisi
         'Times must satisfy 0 < start < end, and end cannot exceed 24:00 (1440 min).',
     };
   }
-
   if (start <= now) {
     return {
       status: 'unavailable',
@@ -36,8 +45,6 @@ export function checkAvailability({ room, start, end, now }: CheckInput): Decisi
       reason: `The start time must be later than the current time (${formatTime(now)}).`,
     };
   }
-
-  const duration = end - start;
   if (duration > MAX_BOOKING_MINUTES) {
     return {
       status: 'unavailable',
@@ -45,18 +52,14 @@ export function checkAvailability({ room, start, end, now }: CheckInput): Decisi
       reason: `Maximum booking length is ${MAX_BOOKING_MINUTES} minutes; you requested ${duration}.`,
     };
   }
-
-  if (room.blocked) {
+  if (blocked) {
     return {
       status: 'unavailable',
       message: 'Room is blocked.',
       reason: 'This room is currently blocked and cannot be booked.',
     };
   }
-
-  const clash = room.bookings.find(
-    (b: Booking) => start < b.end && end > b.start,
-  );
+  const clash = bookings.find((b) => start < b.end && end > b.start);
   if (clash) {
     return {
       status: 'unavailable',
@@ -64,10 +67,10 @@ export function checkAvailability({ room, start, end, now }: CheckInput): Decisi
       reason: `Conflicts with ${clash.bookedBy} (${formatTime(clash.start)}–${formatTime(clash.end)}). Touching endpoints are allowed.`,
     };
   }
-
   return {
-    status: 'available',
-    message: `Available for ${duration} min (${formatTime(start)}–${formatTime(end)}).`,
+    status: 'unavailable',
+    message: 'Unavailable.',
+    reason: 'The request does not meet the booking rules.',
   };
 }
 

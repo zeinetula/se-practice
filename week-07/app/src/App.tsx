@@ -11,8 +11,9 @@ import {
   Ban,
 } from 'lucide-react';
 import { SAMPLE_ROOMS, Room } from '@/lib/rooms';
+import { canBook } from './booking';
 import {
-  checkAvailability,
+  describeDecision,
   formatTime,
   parseTime,
   MAX_BOOKING_MINUTES,
@@ -41,7 +42,16 @@ export default function App() {
 
   const decision = useMemo(() => {
     if (start === null || end === null) return null;
-    return checkAvailability({ room: selectedRoom, start, end, now });
+    const request = {
+      start,
+      end,
+      now,
+      blocked: selectedRoom.blocked,
+      bookings: selectedRoom.bookings,
+    };
+    // The decision comes from canBook (src/booking.ts); the page only words it.
+    const available = canBook(request);
+    return describeDecision(available, request);
   }, [selectedRoom, start, end, now]);
 
   return (
@@ -207,7 +217,7 @@ function Checker({
   onEnd: (v: string) => void;
   now: number;
   onResetNow: () => void;
-  decision: ReturnType<typeof checkAvailability> | null;
+  decision: ReturnType<typeof describeDecision> | null;
 }) {
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
@@ -325,7 +335,7 @@ function TimeField({
 function DecisionCard({
   decision,
 }: {
-  decision: ReturnType<typeof checkAvailability>;
+  decision: ReturnType<typeof describeDecision>;
 }) {
   const ok = decision.status === 'available';
   return (
