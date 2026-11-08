@@ -1,8 +1,8 @@
 # Week 07 — Lab report
 
-**Name:**
-**Group:**
-**Date:**
+**Name:** Ayan Zeinetula (24B031804)
+**Group:** SITE, IS, 3rd year
+**Date:** 8 November 2026
 
 Fill in every section. **Do not delete, rename or renumber the headings.** The checker and the
 grader find your answers by them. You can add rows to any table, but never remove its header.
@@ -13,13 +13,13 @@ grader find your answers by them. You can add rows to any table, but never remov
 
 | | |
 | --- | --- |
-| Project I continue (`week-06` = my Week 06 Bolt project, `starter` = the provided starter) | |
-| Bolt project link (or `not shared`, and why) | |
-| Assistant that generated the tests (tool) | |
-| Exact model (with its version, or `not displayed`) | |
-| Where I ran the tests (Bolt terminal / my computer / Codespace) | |
+| Project I continue (`week-06` = my Week 06 Bolt project, `starter` = the provided starter) | week-06 (the Bolt export in `week-06/original/project`; `week-06/prototype/` was empty) |
+| Bolt project link (or `not shared`, and why) | not shared: I continued from the exported project files in the repository, not from the Bolt workspace |
+| Assistant that generated the tests (tool) | Claude (claude.ai, agent session) |
+| Exact model (with its version, or `not displayed`) | Claude Opus 5.5 (claude-opus-5-5) |
+| Where I ran the tests (Bolt terminal / my computer / Codespace) | Claude's cloud Linux workspace (Node 22.23.4), not my own laptop |
 | Vitest version (the `RUN  v…` line of a run) | |
-| Test command | |
+| Test command | `npx vitest run` (same as `npm test`), run inside `week-07/app/` |
 
 ---
 
@@ -29,15 +29,16 @@ grader find your answers by them. You can add rows to any table, but never remov
 
 | | |
 | --- | --- |
-| File and function (or "inside the page component") | |
-| Its inputs | |
-| What it returned | |
-| How the page used it | |
+| File and function (or "inside the page component") | `checkAvailability()` in `src/lib/availability.ts` |
+| Its inputs | `{ room, start, end, now }`: the whole `Room` object (its `blocked` flag and `bookings` array) plus three numbers in minutes after midnight |
+| What it returned | a `Decision` object: `{ status: 'available', message }` or `{ status: 'unavailable', message, reason }`, not a boolean |
+| How the page used it | `App.tsx` called it inside a `useMemo` with the selected room and the parsed HH:MM inputs, and `DecisionCard` showed Available / Unavailable from `status` plus the message |
 
 **What I changed to extract `canBook`.** Say which file it now lives in, what you moved, and why
 the behaviour did not change. Also say which file of the page now calls it. 40 words or more.
 
 <!-- Write below this line -->
+`canBook({ start, end, now, blocked, bookings })` now lives in `app/src/booking.ts` and returns only `true` or `false`. I moved the five conditions of `checkAvailability()` into it in the same order and with the same operators, including `start > 0`, which I suspect (AC1 says `0 ≤ start`). The two constants moved with them. `checkAvailability()` became `describeDecision(available, input)` in `src/lib/availability.ts`: it no longer decides, it only picks the Week 06 message for a decision it is given. The page file `src/App.tsx` imports `canBook` from `./booking`, calls it with the selected room's `blocked` flag and `bookings`, and passes the result to `describeDecision`. To check that behaviour did not change, I ran the old `checkAvailability()` and the new `canBook()` side by side over 163,494 generated inputs (three booking sets, blocked on/off, three values of `now`, every start/end pair in 5-minute steps from −10 to 1450) and found 0 differences. `npx tsc` and `npm run build` both pass.
 
 ---
 
@@ -49,23 +50,23 @@ for every test. **The Expected column comes from AC1–AC4, never from the code.
 
 | ID | Candidate / changed input | Expected | AC | Reason (in your words) |
 | --- | --- | --- | --- | --- |
-| T01 | 660–720 (touching after) | true | AC4 | |
-| T02 | 540–570 (starts now) | false | AC1 | |
-| T03 | 720–720 (zero duration) | false | AC1 | |
-| T04 | 750–720 (reversed) | false | AC1 | |
-| T05 | 1380–1441 (past day end) | false | AC1 | |
-| T06 | 720–840 (120 minutes) | true | AC2 | |
-| T07 | 720–841 (121 minutes) | false | AC2 | |
-| T08 | 570–600 (touching before) | true | AC4 | |
-| T09 | 630–690 (partial overlap) | false | AC4 | |
-| T10 | 570–690 (contains booking) | false | AC4 | |
-| T11 | 615–645 (inside booking) | false | AC4 | |
-| T12 | 600–660 (identical interval) | false | AC4 | |
-| T13 | 660–720, blocked = true | false | AC3 | |
-| T14 | 630–690, bookings = [] | true | AC4 | |
-| AC5 | an Available request — the bookings after the call equal the bookings before | true, data unchanged | AC5 | |
-| X1 | | | | |
-| X2 | | | | |
+| T01 | 660–720 (touching after) | true | AC4 | 660 is the end of the 600–660 booking and the start of the request; the intervals only touch, which AC4 explicitly allows, and nothing else (time, length, block) is broken |
+| T02 | 540–570 (starts now) | false | AC1 | start 540 equals now 540; AC1 needs start strictly after the current time, and "equal" is not after |
+| T03 | 720–720 (zero duration) | false | AC1 | start 720 = end 720, so `start < end` in AC1 is false; a zero-length interval is not a booking |
+| T04 | 750–720 (reversed) | false | AC1 | start 750 is after end 720, so `start < end` fails; a reversed interval is invalid under AC1 even though it is in the future |
+| T05 | 1380–1441 (past day end) | false | AC1 | end 1441 is one minute past midnight of the next day, so `end ≤ 1440` in AC1 fails; the 61-minute length and the time are otherwise fine |
+| T06 | 720–840 (120 minutes) | true | AC2 | 840 − 720 = 120 minutes; AC2 only rejects longer than 120, so exactly 120 must be accepted, and it does not touch 600–660 |
+| T07 | 720–841 (121 minutes) | false | AC2 | 841 − 720 = 121 minutes, one minute longer than AC2 allows; everything else about the request is valid |
+| T08 | 570–600 (touching before) | true | AC4 | 600 is both the end of the request and the start of the booking; touching endpoints are allowed by AC4, and 570 > now 540 |
+| T09 | 630–690 (partial overlap) | false | AC4 | 630–690 shares 630–660 with the booking, a 30-minute overlap, so AC4 rejects it |
+| T10 | 570–690 (contains booking) | false | AC4 | 570–690 covers the whole 600–660 booking; the overlap is the full booking, so AC4 rejects it (length is exactly 120, so AC2 is not the reason) |
+| T11 | 615–645 (inside booking) | false | AC4 | 615–645 lies completely inside 600–660; every minute overlaps, so AC4 rejects it |
+| T12 | 600–660 (identical interval) | false | AC4 | same start and end as the existing booking: the strongest overlap there is, so AC4 rejects it |
+| T13 | 660–720, blocked = true | false | AC3 | 660–720 would be Available (as T01), so the only reason to reject is the block; AC3 says a blocked room is always rejected |
+| T14 | 630–690, bookings = [] | true | AC4 | 630–690 overlapped in T09, but with no bookings there is nothing to overlap; it is in the future, 60 minutes, unblocked, so AC1–AC4 all accept it |
+| AC5 | an Available request — the bookings after the call equal the bookings before | true, data unchanged | AC5 | a check is a read; AC5 says the decision must not change the existing booking data, so the bookings array must equal a copy taken before the call, and the call must be an Available one so the success path is exercised |
+| X1 | 1320–1440 (ends exactly at 24:00, 120 minutes) | true | AC1, AC2 | the other end of the day: AC1 allows `end ≤ 1440`, so 1440 itself is inside the day, and 120 minutes is not longer than AC2's limit; nothing overlaps, so both boundaries hold at once |
+| X2 | 750–800, bookings = [{600–660}, {720–780}] | false | AC4 | two bookings at once: the request is clear of the first booking but overlaps 750–780 of the second; AC4 says "any" existing booking, so a rule that only looks at the first booking must fail this case |
 
 X1 and X2 are **your own two cases**: a boundary or a state that T01–T14 do not reach. Fill all
 five columns.
