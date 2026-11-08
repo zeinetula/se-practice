@@ -212,8 +212,13 @@ requests* · *mocked booking function*, or your own) and the AC that decides it.
 
 | # | Test or part of the suite | What is weak or wrong | Decision: accept / revise / reject | AC or reason |
 | --- | --- | --- | --- | --- |
-| 1 | | | accept / revise / reject | |
-| 2 | | | accept / revise / reject | |
+| 1 | `beforeEach` / `afterEach`: `vi.useFakeTimers()` + `vi.setSystemTime(new Date('2026-01-15T09:00:00.000Z'))` | own kind, a fake fixed time: `canBook` never reads the clock, because `now` is a parameter. The frozen clock is also the same 09:00 as `now = 540`, so it cannot catch a version that reads the clock. It only adds a `new Date()` the lab's fixed-time rule forbids | revise: remove the fake timers and `new Date`, keep `now` as the number 540 | AC1 ("the *supplied* current time"): time is an input, so a fixed number is the whole fixture |
+| 2 | Every T test and X test: `expectDecision(makeRequest(…), false)`; the only `.toBe(expected)` sits inside the helper | close to *no exception occurred*: the test body shows no assertion, only a bare `true`/`false` argument. Reading T13 alone, I cannot see that it asserts `false`, and a later edit of the helper (e.g. to `toBeDefined`) would weaken all 16 tests at once without touching them | revise: each test writes `expect(decide(…)).toBe(false)` itself; the helper only freezes the data, checks it, and returns the decision | AC1–AC4: the decision is exact, so the exact value belongs in each test |
+| 3 | Expected values of T01–T14, X1, X2 | checked for *expected = current output*: I compared every expected value with my section 3 table before running anything; all 16 match the ACs, and T06 (exactly 120 → true) and T01/T08 (touching → true) are right | accept | AC1–AC4 and the section 3 reasons |
+| 4 | `import { canBook } from './booking'`, no `vi.mock`, no `.skip`/`.only`, no `test.each` | checked for *mocked booking function*: it imports the real module the page imports (`App.tsx` uses the same `./booking`) | accept | the deck: import the function used by the UI |
+| 5 | AC5 test: compares with a hand-typed literal `[{ start: 600, end: 660 }]` | own kind, a copy that is not a copy: the "before" value is typed again, not taken from the data. If the fixture changes, the literal does not follow, and a change undone before the end of the call (push then pop) passes | revise: take `JSON.stringify(request.bookings)` before the call, compare after, and deep-freeze the request so any write throws | AC5: the booking data must not change |
+| 6 | Boundaries the table does not reach | *only valid requests* is not the problem (8 of 16 cases expect `false`), but there is no 1-minute overlap, no "first minute after now", no 24:00 twin for T05, and every test uses `now = 540`, so a hard-coded 540 would pass | revise: add R01–R06 from the improvement answer (6.2) | AC1 (supplied now, end ≤ 1440), AC4 (any overlap, even 1 minute) |
+| 7 | The assistant's flag 1: AC1 says `0 ≤ start`, code says `start > 0` | real mismatch, but only reachable with `now < 0`, which is not a valid time of day | reject a test for it (`now = -1` is outside the input range); kept as a known limitation in 9.2 | AC1 with `now` in 0–1440 |
 
 ---
 
@@ -226,7 +231,15 @@ The **real** terminal output of the first run of the first suite, pasted unedite
 is not a run.
 
 ```text
-(paste here)
+
+ RUN  v3.2.7 /home/claude/work/week-07/app
+
+ ✓ src/booking.test.ts (17 tests) 9ms
+
+ Test Files  1 passed (1)
+      Tests  17 passed (17)
+   Start at  22:24:47
+   Duration  309ms (transform 31ms, setup 0ms, collect 30ms, tests 9ms, environment 0ms, prepare 117ms)
 ```
 
 **Each failure, diagnosed** (the deck's table: import/runner error · assertion mismatch · result
@@ -234,7 +247,7 @@ changing per run · no tests discovered). Write `none` in the first row if nothi
 
 | Failing test | Observed failure | First check | Test repair or implementation fix? | Action taken |
 | --- | --- | --- | --- | --- |
-| | | | | |
+| none | no test failed: 17 passed (17), 1 test file found, no import or runner error | I still checked each expected value against section 3, because a green first run can mean the tests copied the code; they did not | neither: no failure, so no implementation fix; the test repairs come from the review (section 5), not from a failure | kept `booking.ts` unchanged; revised the suite as in section 5 and 6.2 |
 
 ### 6.2 The improvement prompt
 
@@ -242,8 +255,304 @@ The deck's improvement prompt exactly as sent, followed by the actual output fro
 paste the assistant's answer, unedited:
 
 ```text
-(paste here)
+Review this test suite against AC1–AC6 and our case table. Identify incorrect expectations, weak assertions, duplicated cases, and missing boundaries.
+
+For each proposed change, explain the requirement and the defect it could detect. Improve the tests without changing correct expectations to match buggy behavior.
+
+Use the actual failure output below. Separate test repairs from implementation fixes.
+
+
+ RUN  v3.2.7 /home/claude/work/week-07/app
+
+ ✓ src/booking.test.ts (17 tests) 9ms
+
+ Test Files  1 passed (1)
+      Tests  17 passed (17)
+   Start at  22:24:47
+   Duration  309ms (transform 31ms, setup 0ms, collect 30ms, tests 9ms, environment 0ms, prepare 117ms)
 ```
+
+The assistant's answer (same chat as the generation prompt), unedited:
+
+````text
+# Review of `src/booking.test.ts` against AC1–AC6 and the case table
+
+## 1. What the run output shows
+
+The output you sent has **no failures**: 17 of 17 tests passed (`Tests 17 passed (17)`). That matches what I expected from tracing each case through `canBook`, but it has two consequences:
+
+- **No implementation fix is shown by this run.** No test failed, so the run gives no evidence of a bug. The only possible implementation change below comes from comparing the code with the AC text, not from a failure.
+- **A green run does not show the tests are strong.** It only shows the current code agrees with them. The review below asks a different question: which wrong versions of `canBook` would still pass this suite?
+
+## 2. Findings
+
+### 2.1 Incorrect expectations: none found
+
+I checked all 17 expected values against AC1–AC4 and the reviewed table. All of them follow the ACs, not the code. I changed no expected values.
+
+### 2.2 Weak assertions
+
+**W1. The frozen clock is set to the same time as `now`. (Most important.)**
+- **Requirement:** AC1 says start must be after the *supplied* current time, which is the `now` parameter, not the system clock.
+- **Defect:** The fake clock was 09:00, which is 540 minutes, the same as fixture `now = 540`. A wrong version that reads `new Date()` instead of `now` would get 540 either way and pass every test.
+- **Repair:** Freeze the clock at 23:30 (1410 minutes), far from 540. Code that uses the clock would then reject almost every request, and the "true" cases would fail.
+
+**W2. Every test uses `now = 540`.**
+- **Requirement:** AC1 again: the decision must use the supplied `now`.
+- **Defect:** A version with 540 hard-coded (for example `if (start <= 540)`) passes the whole suite.
+- **Repair:** Add a pair of tests with a different `now` (R04 and R05). The same request, 660–720, must be true with `now = 659` and false with `now = 660`.
+
+**W3. The data check compares contents only after the call.**
+- **Requirement:** AC5 says the decision must not change the existing booking data.
+- **Defect:** A version that changes the data and then puts it back (for example a temporary `sort`, or `push` then `pop`) would pass. So would a version that changes fields on the request object.
+- **Repair:** Deep-freeze the request and its bookings before the call. Test files and `booking.ts` are ES modules, which run in strict mode, so any write to a frozen object throws a `TypeError` and fails the test. The before/after comparison stays as a second check.
+
+**W4. The decision is a boolean, so a `false` does not show why it was rejected.**
+- **Requirement:** Each AC2–AC4 case is meant to fail for one reason only.
+- **Defect:** A version with a broken rule can still return `false` for some other reason. For example, T05 (1380–1441) could be rejected by a wrong rule even if the end-of-day check were missing.
+- **Repair:** Give each `false` boundary case a "twin" that changes only the value under test and expects `true`. T06/T07 and T01/T13 already work this way. New twins: R01 for T02 (start one minute after `now`), and R02 for T05 (same start, end exactly 1440).
+
+**W5. The AC5 test has a redundant check.**
+- `toHaveLength(1)` is already implied by `toStrictEqual(copyBefore)`, so I removed it. The test still uses an independent literal copy and confirms that the result is Available (the success path).
+
+### 2.3 Duplicated cases: none to remove
+
+Some cases look alike, but each one catches a different wrong overlap or length rule:
+
+| Cases | Why each one is kept |
+| --- | --- |
+| T09, T10, T11, T12 | A rule that only checks whether the request's start or end falls inside the booking misses T10 (the request contains the booking). A rule that only checks whether the booking's start falls inside the request misses T11 (the request is inside the booking). T12 catches rules that only use strict inequalities on both endpoints. |
+| T06 vs X1 | Both are 120 minutes long, but only X1 also tests `end = 1440`. |
+| T01 vs T13 | Same interval on purpose. T01 shows that T13's `false` can only come from the block (AC3). |
+| AC5 vs the helper | The helper checks data in every test. The AC5 test is the case the table names, with an Available result and an independent copy. |
+
+### 2.4 Missing boundaries
+
+| New ID | Case | AC | Wrong code it would catch |
+| --- | --- | --- | --- |
+| R01 | 541–571 → true | AC1 | `start <= now + 1`, or any off-by-one that rejects the first allowed minute. It is also the twin for T02. |
+| R02 | 1380–1440 → true | AC1 | `end < 1440` (excluding the end of the day). It is also the twin for T05. |
+| R03 | 659–720 → false | AC4 | Overlap rules with a tolerance, or rounding, that accept a 1-minute overlap at the booking's end. T09 overlaps by 30 minutes, which is too large to catch this. |
+| R04 | 541–601 → false | AC4 | The same as R03, at the booking's start edge (overlap 600–601). |
+| R05 | 660–720 with `now = 659` → true | AC1 | `now` hard-coded to 540, or code that ignores the parameter (see W2). |
+| R06 | 660–720 with `now = 660` → false | AC1 | Same as R05. Together they prove the decision depends on `now`. |
+
+I checked one more case and kept it out: **start = 0** (`0 ≤ start` in AC1). See section 4.
+
+## 3. Test repairs: revised `src/booking.test.ts`
+
+```ts
+// Tests for the booking decision used by the page (src/booking.ts).
+// Sources: AC1–AC6, the reviewed case table (T01–T14, AC5, X1, X2)
+// and review additions R01–R06.
+// Default fixture: now = 540, blocked = false, bookings = [{ start: 600, end: 660 }],
+// built fresh for every test.
+
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { canBook } from './booking';
+import type { BookingRequest } from './booking';
+
+// Fixed time. AC1 uses the *supplied* current time (the now parameter, 540 = 09:00).
+// The system clock is frozen at 23:30 local time (1410 minutes), deliberately far
+// from 540, so any code that reads the real clock instead of `now` gives different
+// results and fails.
+const FIXED_NOW = 540;
+const FIXED_CLOCK = new Date(2026, 0, 15, 23, 30, 0, 0);
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(FIXED_CLOCK);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+// A fresh request every call: new object and new bookings array, never shared between tests.
+function makeRequest(
+  start: number,
+  end: number,
+  changes: Partial<Omit<BookingRequest, 'start' | 'end'>> = {},
+): BookingRequest {
+  return {
+    start,
+    end,
+    now: FIXED_NOW,
+    blocked: false,
+    bookings: [{ start: 600, end: 660 }],
+    ...changes,
+  };
+}
+
+// Freezes the request and its bookings, so any write throws a TypeError (ES modules run in strict mode).
+function deepFreeze(request: BookingRequest): BookingRequest {
+  request.bookings.forEach((b) => Object.freeze(b));
+  Object.freeze(request.bookings);
+  return Object.freeze(request);
+}
+
+// Checks the exact decision and that the booking data did not change (AC5).
+function expectDecision(request: BookingRequest, expected: boolean): void {
+  const bookingsRef = request.bookings;
+  const bookingsBefore = request.bookings.map((b) => ({ ...b }));
+
+  const decision = canBook(deepFreeze(request));
+
+  expect(decision).toBe(expected);
+  expect(request.bookings).toBe(bookingsRef); // same array, not replaced
+  expect(request.bookings).toStrictEqual(bookingsBefore); // same contents
+}
+
+describe('canBook – AC1: valid interval inside the day, start after now', () => {
+  test('T02: 540–570 starts exactly at now (540) → false', () => {
+    expectDecision(makeRequest(540, 570), false);
+  });
+
+  test('R01: 541–571 starts one minute after now → true (twin of T02)', () => {
+    expectDecision(makeRequest(541, 571), true);
+  });
+
+  test('T03: 720–720 zero duration → false', () => {
+    expectDecision(makeRequest(720, 720), false);
+  });
+
+  test('T04: 750–720 reversed interval → false', () => {
+    expectDecision(makeRequest(750, 720), false);
+  });
+
+  test('T05: 1380–1441 ends past the end of the day → false', () => {
+    expectDecision(makeRequest(1380, 1441), false);
+  });
+
+  test('R02: 1380–1440 ends exactly at 24:00 → true (twin of T05)', () => {
+    expectDecision(makeRequest(1380, 1440), true);
+  });
+
+  test('X1: 1320–1440 ends exactly at 24:00 and is 120 minutes → true', () => {
+    expectDecision(makeRequest(1320, 1440), true);
+  });
+
+  test('R05: 660–720 with now = 659 → true (decision uses the supplied now)', () => {
+    expectDecision(makeRequest(660, 720, { now: 659 }), true);
+  });
+
+  test('R06: 660–720 with now = 660 → false (start equals the supplied now)', () => {
+    expectDecision(makeRequest(660, 720, { now: 660 }), false);
+  });
+});
+
+describe('canBook – AC2: no longer than 120 minutes', () => {
+  test('T06: 720–840 is exactly 120 minutes → true', () => {
+    expectDecision(makeRequest(720, 840), true);
+  });
+
+  test('T07: 720–841 is 121 minutes → false', () => {
+    expectDecision(makeRequest(720, 841), false);
+  });
+});
+
+describe('canBook – AC3: blocked room', () => {
+  test('T13: 660–720 (Available as in T01) but blocked = true → false', () => {
+    expectDecision(makeRequest(660, 720, { blocked: true }), false);
+  });
+});
+
+describe('canBook – AC4: no overlap, touching endpoints allowed', () => {
+  test('T01: 660–720 touches the end of 600–660 → true', () => {
+    expectDecision(makeRequest(660, 720), true);
+  });
+
+  test('T08: 570–600 touches the start of 600–660 → true', () => {
+    expectDecision(makeRequest(570, 600), true);
+  });
+
+  test('R03: 659–720 overlaps the booking by one minute at its end → false', () => {
+    expectDecision(makeRequest(659, 720), false);
+  });
+
+  test('R04: 541–601 overlaps the booking by one minute at its start → false', () => {
+    expectDecision(makeRequest(541, 601), false);
+  });
+
+  test('T09: 630–690 partially overlaps 600–660 → false', () => {
+    expectDecision(makeRequest(630, 690), false);
+  });
+
+  test('T10: 570–690 contains the whole booking (120 minutes) → false', () => {
+    expectDecision(makeRequest(570, 690), false);
+  });
+
+  test('T11: 615–645 lies inside the booking → false', () => {
+    expectDecision(makeRequest(615, 645), false);
+  });
+
+  test('T12: 600–660 is identical to the booking → false', () => {
+    expectDecision(makeRequest(600, 660), false);
+  });
+
+  test('T14: 630–690 with no bookings → true', () => {
+    expectDecision(makeRequest(630, 690, { bookings: [] }), true);
+  });
+
+  test('X2: 750–800 is clear of 600–660 but overlaps the second booking 720–780 → false', () => {
+    expectDecision(
+      makeRequest(750, 800, {
+        bookings: [
+          { start: 600, end: 660 },
+          { start: 720, end: 780 },
+        ],
+      }),
+      false,
+    );
+  });
+});
+
+describe('canBook – AC5: decision does not change existing booking data', () => {
+  test('AC5: an Available request leaves the bookings equal to a copy taken before the call', () => {
+    const request = deepFreeze(makeRequest(660, 720));
+    const bookingsRef = request.bookings;
+    const copyBefore = [{ start: 600, end: 660 }];
+
+    const decision = canBook(request);
+
+    expect(decision).toBe(true); // the success path is exercised
+    expect(request.bookings).toBe(bookingsRef);
+    expect(request.bookings).toStrictEqual(copyBefore);
+  });
+});
+```
+
+**Run command:** `npx vitest run src/booking.test.ts`
+
+The file now has 23 tests. I have not run it. I traced each new case through the current `canBook` code by hand, and I expect all 23 to pass. Your run is the real result.
+
+**Updated AC mapping:**
+
+| AC | Tests |
+| --- | --- |
+| AC1 | T02, R01, T03, T04, T05, R02, X1, R05, R06 |
+| AC2 | T06, T07, X1 |
+| AC3 | T13 |
+| AC4 | T01, T08, R03, R04, T09, T10, T11, T12, T14, X2 |
+| AC5 (data part) | AC5 test, plus the frozen-data and before/after checks in every test |
+| AC6 | Not covered by unit tests (see section 4) |
+
+## 4. Implementation fixes, kept separate from test repairs
+
+No failing test supports an implementation fix: the run was 17 of 17 passing. These are open points that need a decision first:
+
+1. **AC1 lower bound (possible fix).** AC1 says `0 ≤ start`, but the code checks `start > 0`. This only makes a difference if `now` can be negative, because the code also needs `start > now`. If the team decides a negative `now` is valid input, this test expresses AC1 and would **fail** against the current code:
+   ```ts
+   test('AC1: start = 0 is inside the day when now is earlier → true', () => {
+     expectDecision(makeRequest(0, 30, { now: -1 }), true);
+   });
+   ```
+   The fix would be to change `start > 0` to `start >= 0` in `src/booking.ts`. If `now` is always 0 or more, the case cannot happen, and only the comment or the AC wording needs to match. I did not add the test to the suite, because the case table does not define a negative `now` and I did not want to invent an expectation.
+2. **AC5 (display) and AC6 are not covered.** `canBook` returns only `true` or `false`. It cannot give the reason a request was rejected, which AC6's "understandable validation feedback" needs. Covering this means a design change (for example, returning a reason as well as the decision) plus component or E2E tests at desktop and mobile widths. That is a requirements question, not a bug in the current code.
+3. **The page's real code path.** As flagged before: please confirm that `checkAvailability()` in `src/lib/availability.ts` calls `canBook`. If it keeps its own copy of the rules, none of these tests cover what the page actually runs.
+````
+
+**What I took from it.** Accepted: the deep-freeze of the request (W3), the twins R01/R02 (W4), the 1-minute overlaps R03/R04, and the `now` pair R05/R06 (W2). I also dropped the redundant `toHaveLength` (W5). Rejected: W1, moving the fake clock to 23:30. `canBook` takes `now` as a parameter, the lab rules forbid `new Date()` in the suite, and R05/R06 already show that the decision follows the supplied `now`, so I removed the fake timers completely. I also kept my own revision 2 from section 5: the exact `.toBe(true|false)` is written in every test, because the answer's revised file still hides it inside `expectDecision`. Not adopted: the `start = 0, now = -1` test (section 5, row 7). Two slips in the answer itself: W2 names the new pair "R04 and R05", but the file calls it R05/R06. W1 says the fake clock equals `now = 540`, but `2026-01-15T09:00:00.000Z` is 09:00 UTC, which is 14:00 in Almaty, so it only equals 540 on a UTC machine.
 
 ### 6.3 The final run
 
