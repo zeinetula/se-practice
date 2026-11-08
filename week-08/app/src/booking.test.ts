@@ -160,3 +160,28 @@ describe('AC5: the decision does not change the existing booking data', () => {
     expect(JSON.stringify(request.bookings)).toBe(before);
   });
 });
+
+// Week 08 regression tests. Each one targets one provided bug and must fail on the buggy canBook.
+// They call canBook on a request that is NOT frozen, so each test fails on its own assertion
+// and cannot be blocked by the other bug.
+describe('Week 08 regressions: the provided buggy canBook', () => {
+  test('BUG-A AC4: 660–720 touching 600–660 on its left and 720–780 on its right is accepted', () => {
+    const request = makeRequest(660, 720, {
+      bookings: [
+        { start: 600, end: 660 },
+        { start: 720, end: 780 },
+      ],
+    });
+    expect(canBook(request)).toBe(true);
+  });
+
+  test('BUG-B AC5: 720–780 touches nothing, is accepted, and leaves the bookings unchanged', () => {
+    const request = makeRequest(720, 780); // bookings = [600–660]: no overlap, no shared endpoint
+    const before = structuredClone(request.bookings);
+
+    const decision = canBook(request);
+
+    expect(decision).toBe(true);
+    expect(request.bookings).toEqual(before);
+  });
+});
