@@ -679,3 +679,8 @@ the value you declare in `submission.yml` under `assumptions.invalid_existing_bo
      pass, M1 would have become the real behaviour." -->
 
 <!-- Write your conclusion below this line -->
+(a) The first suite fixed `now = 540` for every test and never included a one‑minute overlap case. A `canBook` that hard‑codes 540 instead of using the `now` parameter, or that treats a one‑minute overlap as non‑overlapping, would have passed all 17 tests. It also relied on a fake timer that `canBook` never reads. I identified these gaps during the review by asking which broken implementations would still be green, then added R03–R06 to close them.
+
+(b) The green run of the improved suite (23 passing tests) shows that those inputs produce decisions that satisfy AC 1–4 and that the bookings array remains unchanged, confirming the core logic. Mutant M2 (touching endpoints counted as overlap) would have caused T01, T08 and the AC 5 check to fail, demonstrating the suite’s ability to catch such bugs. The run does not prove that the UI provides clear validation feedback; in manual check U3 the page displayed the same neutral message for an empty End field and for the illegal string “12”, which the tests cannot detect.
+
+(c) AC 1 permits `start = 0`, but the implementation requires `start > 0`. No test exercises this discrepancy because it only matters when `now` is negative, leaving the mismatch untested.
