@@ -18,7 +18,7 @@ grader find your answers by them. You can add rows to any table, but never remov
 | Assistant that generated the tests (tool) | Claude (claude.ai, agent session) |
 | Exact model (with its version, or `not displayed`) | Claude Opus 5.5 (claude-opus-5-5) |
 | Where I ran the tests (Bolt terminal / my computer / Codespace) | Claude's cloud Linux workspace (Node 22.23.4), not my own laptop |
-| Vitest version (the `RUN  v…` line of a run) | |
+| Vitest version (the `RUN  v…` line of a run) | 3.2.7 (`RUN  v3.2.7`; Vitest 3 because the Bolt project uses Vite 5, and the latest Vitest 5.1 needs Vite 6 or newer) |
 | Test command | `npx vitest run` (same as `npm test`), run inside `week-07/app/` |
 
 ---
@@ -39,6 +39,8 @@ the behaviour did not change. Also say which file of the page now calls it. 40 w
 
 <!-- Write below this line -->
 `canBook({ start, end, now, blocked, bookings })` now lives in `app/src/booking.ts` and returns only `true` or `false`. I moved the five conditions of `checkAvailability()` into it in the same order and with the same operators, including `start > 0`, which I suspect (AC1 says `0 ≤ start`). The two constants moved with them. `checkAvailability()` became `describeDecision(available, input)` in `src/lib/availability.ts`: it no longer decides, it only picks the Week 06 message for a decision it is given. The page file `src/App.tsx` imports `canBook` from `./booking`, calls it with the selected room's `blocked` flag and `bookings`, and passes the result to `describeDecision`. To check that behaviour did not change, I ran the old `checkAvailability()` and the new `canBook()` side by side over 163,494 generated inputs (three booking sets, blocked on/off, three values of `now`, every start/end pair in 5-minute steps from −10 to 1450) and found 0 differences. `npx tsc` and `npm run build` both pass.
+
+**Page changes logged later (Task 7, not part of the extraction).** The Week 06 page read `now` from the real clock and could not block a room, so U1–U3 were impossible with `now = 09:00`. I added a "Current time (HH:MM)" field (defaulting to the real clock, with the old "Update now" button) and a "Treat this room as blocked" checkbox. Both are page state only. They are passed to `canBook` and never written into `SAMPLE_ROOMS`.
 
 ---
 
@@ -272,284 +274,284 @@ Use the actual failure output below. Separate test repairs from implementation f
    Duration  309ms (transform 31ms, setup 0ms, collect 30ms, tests 9ms, environment 0ms, prepare 117ms)
 ```
 
-The assistant's answer (same chat as the generation prompt), unedited:
+The assistant's answer (same chat as the generation prompt), unedited. Every line is indented by two spaces only so that its own `## 1.` to `## 4.` headings are not read as headings of this report:
 
 ````text
-# Review of `src/booking.test.ts` against AC1–AC6 and the case table
+  # Review of `src/booking.test.ts` against AC1–AC6 and the case table
 
-## 1. What the run output shows
+  ## 1. What the run output shows
 
-The output you sent has **no failures**: 17 of 17 tests passed (`Tests 17 passed (17)`). That matches what I expected from tracing each case through `canBook`, but it has two consequences:
+  The output you sent has **no failures**: 17 of 17 tests passed (`Tests 17 passed (17)`). That matches what I expected from tracing each case through `canBook`, but it has two consequences:
 
-- **No implementation fix is shown by this run.** No test failed, so the run gives no evidence of a bug. The only possible implementation change below comes from comparing the code with the AC text, not from a failure.
-- **A green run does not show the tests are strong.** It only shows the current code agrees with them. The review below asks a different question: which wrong versions of `canBook` would still pass this suite?
+  - **No implementation fix is shown by this run.** No test failed, so the run gives no evidence of a bug. The only possible implementation change below comes from comparing the code with the AC text, not from a failure.
+  - **A green run does not show the tests are strong.** It only shows the current code agrees with them. The review below asks a different question: which wrong versions of `canBook` would still pass this suite?
 
-## 2. Findings
+  ## 2. Findings
 
-### 2.1 Incorrect expectations: none found
+  ### 2.1 Incorrect expectations: none found
 
-I checked all 17 expected values against AC1–AC4 and the reviewed table. All of them follow the ACs, not the code. I changed no expected values.
+  I checked all 17 expected values against AC1–AC4 and the reviewed table. All of them follow the ACs, not the code. I changed no expected values.
 
-### 2.2 Weak assertions
+  ### 2.2 Weak assertions
 
-**W1. The frozen clock is set to the same time as `now`. (Most important.)**
-- **Requirement:** AC1 says start must be after the *supplied* current time, which is the `now` parameter, not the system clock.
-- **Defect:** The fake clock was 09:00, which is 540 minutes, the same as fixture `now = 540`. A wrong version that reads `new Date()` instead of `now` would get 540 either way and pass every test.
-- **Repair:** Freeze the clock at 23:30 (1410 minutes), far from 540. Code that uses the clock would then reject almost every request, and the "true" cases would fail.
+  **W1. The frozen clock is set to the same time as `now`. (Most important.)**
+  - **Requirement:** AC1 says start must be after the *supplied* current time, which is the `now` parameter, not the system clock.
+  - **Defect:** The fake clock was 09:00, which is 540 minutes, the same as fixture `now = 540`. A wrong version that reads `new Date()` instead of `now` would get 540 either way and pass every test.
+  - **Repair:** Freeze the clock at 23:30 (1410 minutes), far from 540. Code that uses the clock would then reject almost every request, and the "true" cases would fail.
 
-**W2. Every test uses `now = 540`.**
-- **Requirement:** AC1 again: the decision must use the supplied `now`.
-- **Defect:** A version with 540 hard-coded (for example `if (start <= 540)`) passes the whole suite.
-- **Repair:** Add a pair of tests with a different `now` (R04 and R05). The same request, 660–720, must be true with `now = 659` and false with `now = 660`.
+  **W2. Every test uses `now = 540`.**
+  - **Requirement:** AC1 again: the decision must use the supplied `now`.
+  - **Defect:** A version with 540 hard-coded (for example `if (start <= 540)`) passes the whole suite.
+  - **Repair:** Add a pair of tests with a different `now` (R04 and R05). The same request, 660–720, must be true with `now = 659` and false with `now = 660`.
 
-**W3. The data check compares contents only after the call.**
-- **Requirement:** AC5 says the decision must not change the existing booking data.
-- **Defect:** A version that changes the data and then puts it back (for example a temporary `sort`, or `push` then `pop`) would pass. So would a version that changes fields on the request object.
-- **Repair:** Deep-freeze the request and its bookings before the call. Test files and `booking.ts` are ES modules, which run in strict mode, so any write to a frozen object throws a `TypeError` and fails the test. The before/after comparison stays as a second check.
+  **W3. The data check compares contents only after the call.**
+  - **Requirement:** AC5 says the decision must not change the existing booking data.
+  - **Defect:** A version that changes the data and then puts it back (for example a temporary `sort`, or `push` then `pop`) would pass. So would a version that changes fields on the request object.
+  - **Repair:** Deep-freeze the request and its bookings before the call. Test files and `booking.ts` are ES modules, which run in strict mode, so any write to a frozen object throws a `TypeError` and fails the test. The before/after comparison stays as a second check.
 
-**W4. The decision is a boolean, so a `false` does not show why it was rejected.**
-- **Requirement:** Each AC2–AC4 case is meant to fail for one reason only.
-- **Defect:** A version with a broken rule can still return `false` for some other reason. For example, T05 (1380–1441) could be rejected by a wrong rule even if the end-of-day check were missing.
-- **Repair:** Give each `false` boundary case a "twin" that changes only the value under test and expects `true`. T06/T07 and T01/T13 already work this way. New twins: R01 for T02 (start one minute after `now`), and R02 for T05 (same start, end exactly 1440).
+  **W4. The decision is a boolean, so a `false` does not show why it was rejected.**
+  - **Requirement:** Each AC2–AC4 case is meant to fail for one reason only.
+  - **Defect:** A version with a broken rule can still return `false` for some other reason. For example, T05 (1380–1441) could be rejected by a wrong rule even if the end-of-day check were missing.
+  - **Repair:** Give each `false` boundary case a "twin" that changes only the value under test and expects `true`. T06/T07 and T01/T13 already work this way. New twins: R01 for T02 (start one minute after `now`), and R02 for T05 (same start, end exactly 1440).
 
-**W5. The AC5 test has a redundant check.**
-- `toHaveLength(1)` is already implied by `toStrictEqual(copyBefore)`, so I removed it. The test still uses an independent literal copy and confirms that the result is Available (the success path).
+  **W5. The AC5 test has a redundant check.**
+  - `toHaveLength(1)` is already implied by `toStrictEqual(copyBefore)`, so I removed it. The test still uses an independent literal copy and confirms that the result is Available (the success path).
 
-### 2.3 Duplicated cases: none to remove
+  ### 2.3 Duplicated cases: none to remove
 
-Some cases look alike, but each one catches a different wrong overlap or length rule:
+  Some cases look alike, but each one catches a different wrong overlap or length rule:
 
-| Cases | Why each one is kept |
-| --- | --- |
-| T09, T10, T11, T12 | A rule that only checks whether the request's start or end falls inside the booking misses T10 (the request contains the booking). A rule that only checks whether the booking's start falls inside the request misses T11 (the request is inside the booking). T12 catches rules that only use strict inequalities on both endpoints. |
-| T06 vs X1 | Both are 120 minutes long, but only X1 also tests `end = 1440`. |
-| T01 vs T13 | Same interval on purpose. T01 shows that T13's `false` can only come from the block (AC3). |
-| AC5 vs the helper | The helper checks data in every test. The AC5 test is the case the table names, with an Available result and an independent copy. |
+  | Cases | Why each one is kept |
+  | --- | --- |
+  | T09, T10, T11, T12 | A rule that only checks whether the request's start or end falls inside the booking misses T10 (the request contains the booking). A rule that only checks whether the booking's start falls inside the request misses T11 (the request is inside the booking). T12 catches rules that only use strict inequalities on both endpoints. |
+  | T06 vs X1 | Both are 120 minutes long, but only X1 also tests `end = 1440`. |
+  | T01 vs T13 | Same interval on purpose. T01 shows that T13's `false` can only come from the block (AC3). |
+  | AC5 vs the helper | The helper checks data in every test. The AC5 test is the case the table names, with an Available result and an independent copy. |
 
-### 2.4 Missing boundaries
+  ### 2.4 Missing boundaries
 
-| New ID | Case | AC | Wrong code it would catch |
-| --- | --- | --- | --- |
-| R01 | 541–571 → true | AC1 | `start <= now + 1`, or any off-by-one that rejects the first allowed minute. It is also the twin for T02. |
-| R02 | 1380–1440 → true | AC1 | `end < 1440` (excluding the end of the day). It is also the twin for T05. |
-| R03 | 659–720 → false | AC4 | Overlap rules with a tolerance, or rounding, that accept a 1-minute overlap at the booking's end. T09 overlaps by 30 minutes, which is too large to catch this. |
-| R04 | 541–601 → false | AC4 | The same as R03, at the booking's start edge (overlap 600–601). |
-| R05 | 660–720 with `now = 659` → true | AC1 | `now` hard-coded to 540, or code that ignores the parameter (see W2). |
-| R06 | 660–720 with `now = 660` → false | AC1 | Same as R05. Together they prove the decision depends on `now`. |
+  | New ID | Case | AC | Wrong code it would catch |
+  | --- | --- | --- | --- |
+  | R01 | 541–571 → true | AC1 | `start <= now + 1`, or any off-by-one that rejects the first allowed minute. It is also the twin for T02. |
+  | R02 | 1380–1440 → true | AC1 | `end < 1440` (excluding the end of the day). It is also the twin for T05. |
+  | R03 | 659–720 → false | AC4 | Overlap rules with a tolerance, or rounding, that accept a 1-minute overlap at the booking's end. T09 overlaps by 30 minutes, which is too large to catch this. |
+  | R04 | 541–601 → false | AC4 | The same as R03, at the booking's start edge (overlap 600–601). |
+  | R05 | 660–720 with `now = 659` → true | AC1 | `now` hard-coded to 540, or code that ignores the parameter (see W2). |
+  | R06 | 660–720 with `now = 660` → false | AC1 | Same as R05. Together they prove the decision depends on `now`. |
 
-I checked one more case and kept it out: **start = 0** (`0 ≤ start` in AC1). See section 4.
+  I checked one more case and kept it out: **start = 0** (`0 ≤ start` in AC1). See section 4.
 
-## 3. Test repairs: revised `src/booking.test.ts`
+  ## 3. Test repairs: revised `src/booking.test.ts`
 
-```ts
-// Tests for the booking decision used by the page (src/booking.ts).
-// Sources: AC1–AC6, the reviewed case table (T01–T14, AC5, X1, X2)
-// and review additions R01–R06.
-// Default fixture: now = 540, blocked = false, bookings = [{ start: 600, end: 660 }],
-// built fresh for every test.
+  ```ts
+  // Tests for the booking decision used by the page (src/booking.ts).
+  // Sources: AC1–AC6, the reviewed case table (T01–T14, AC5, X1, X2)
+  // and review additions R01–R06.
+  // Default fixture: now = 540, blocked = false, bookings = [{ start: 600, end: 660 }],
+  // built fresh for every test.
 
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { canBook } from './booking';
-import type { BookingRequest } from './booking';
+  import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+  import { canBook } from './booking';
+  import type { BookingRequest } from './booking';
 
-// Fixed time. AC1 uses the *supplied* current time (the now parameter, 540 = 09:00).
-// The system clock is frozen at 23:30 local time (1410 minutes), deliberately far
-// from 540, so any code that reads the real clock instead of `now` gives different
-// results and fails.
-const FIXED_NOW = 540;
-const FIXED_CLOCK = new Date(2026, 0, 15, 23, 30, 0, 0);
+  // Fixed time. AC1 uses the *supplied* current time (the now parameter, 540 = 09:00).
+  // The system clock is frozen at 23:30 local time (1410 minutes), deliberately far
+  // from 540, so any code that reads the real clock instead of `now` gives different
+  // results and fails.
+  const FIXED_NOW = 540;
+  const FIXED_CLOCK = new Date(2026, 0, 15, 23, 30, 0, 0);
 
-beforeEach(() => {
-  vi.useFakeTimers();
-  vi.setSystemTime(FIXED_CLOCK);
-});
-
-afterEach(() => {
-  vi.useRealTimers();
-});
-
-// A fresh request every call: new object and new bookings array, never shared between tests.
-function makeRequest(
-  start: number,
-  end: number,
-  changes: Partial<Omit<BookingRequest, 'start' | 'end'>> = {},
-): BookingRequest {
-  return {
-    start,
-    end,
-    now: FIXED_NOW,
-    blocked: false,
-    bookings: [{ start: 600, end: 660 }],
-    ...changes,
-  };
-}
-
-// Freezes the request and its bookings, so any write throws a TypeError (ES modules run in strict mode).
-function deepFreeze(request: BookingRequest): BookingRequest {
-  request.bookings.forEach((b) => Object.freeze(b));
-  Object.freeze(request.bookings);
-  return Object.freeze(request);
-}
-
-// Checks the exact decision and that the booking data did not change (AC5).
-function expectDecision(request: BookingRequest, expected: boolean): void {
-  const bookingsRef = request.bookings;
-  const bookingsBefore = request.bookings.map((b) => ({ ...b }));
-
-  const decision = canBook(deepFreeze(request));
-
-  expect(decision).toBe(expected);
-  expect(request.bookings).toBe(bookingsRef); // same array, not replaced
-  expect(request.bookings).toStrictEqual(bookingsBefore); // same contents
-}
-
-describe('canBook – AC1: valid interval inside the day, start after now', () => {
-  test('T02: 540–570 starts exactly at now (540) → false', () => {
-    expectDecision(makeRequest(540, 570), false);
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(FIXED_CLOCK);
   });
 
-  test('R01: 541–571 starts one minute after now → true (twin of T02)', () => {
-    expectDecision(makeRequest(541, 571), true);
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
-  test('T03: 720–720 zero duration → false', () => {
-    expectDecision(makeRequest(720, 720), false);
-  });
+  // A fresh request every call: new object and new bookings array, never shared between tests.
+  function makeRequest(
+    start: number,
+    end: number,
+    changes: Partial<Omit<BookingRequest, 'start' | 'end'>> = {},
+  ): BookingRequest {
+    return {
+      start,
+      end,
+      now: FIXED_NOW,
+      blocked: false,
+      bookings: [{ start: 600, end: 660 }],
+      ...changes,
+    };
+  }
 
-  test('T04: 750–720 reversed interval → false', () => {
-    expectDecision(makeRequest(750, 720), false);
-  });
+  // Freezes the request and its bookings, so any write throws a TypeError (ES modules run in strict mode).
+  function deepFreeze(request: BookingRequest): BookingRequest {
+    request.bookings.forEach((b) => Object.freeze(b));
+    Object.freeze(request.bookings);
+    return Object.freeze(request);
+  }
 
-  test('T05: 1380–1441 ends past the end of the day → false', () => {
-    expectDecision(makeRequest(1380, 1441), false);
-  });
-
-  test('R02: 1380–1440 ends exactly at 24:00 → true (twin of T05)', () => {
-    expectDecision(makeRequest(1380, 1440), true);
-  });
-
-  test('X1: 1320–1440 ends exactly at 24:00 and is 120 minutes → true', () => {
-    expectDecision(makeRequest(1320, 1440), true);
-  });
-
-  test('R05: 660–720 with now = 659 → true (decision uses the supplied now)', () => {
-    expectDecision(makeRequest(660, 720, { now: 659 }), true);
-  });
-
-  test('R06: 660–720 with now = 660 → false (start equals the supplied now)', () => {
-    expectDecision(makeRequest(660, 720, { now: 660 }), false);
-  });
-});
-
-describe('canBook – AC2: no longer than 120 minutes', () => {
-  test('T06: 720–840 is exactly 120 minutes → true', () => {
-    expectDecision(makeRequest(720, 840), true);
-  });
-
-  test('T07: 720–841 is 121 minutes → false', () => {
-    expectDecision(makeRequest(720, 841), false);
-  });
-});
-
-describe('canBook – AC3: blocked room', () => {
-  test('T13: 660–720 (Available as in T01) but blocked = true → false', () => {
-    expectDecision(makeRequest(660, 720, { blocked: true }), false);
-  });
-});
-
-describe('canBook – AC4: no overlap, touching endpoints allowed', () => {
-  test('T01: 660–720 touches the end of 600–660 → true', () => {
-    expectDecision(makeRequest(660, 720), true);
-  });
-
-  test('T08: 570–600 touches the start of 600–660 → true', () => {
-    expectDecision(makeRequest(570, 600), true);
-  });
-
-  test('R03: 659–720 overlaps the booking by one minute at its end → false', () => {
-    expectDecision(makeRequest(659, 720), false);
-  });
-
-  test('R04: 541–601 overlaps the booking by one minute at its start → false', () => {
-    expectDecision(makeRequest(541, 601), false);
-  });
-
-  test('T09: 630–690 partially overlaps 600–660 → false', () => {
-    expectDecision(makeRequest(630, 690), false);
-  });
-
-  test('T10: 570–690 contains the whole booking (120 minutes) → false', () => {
-    expectDecision(makeRequest(570, 690), false);
-  });
-
-  test('T11: 615–645 lies inside the booking → false', () => {
-    expectDecision(makeRequest(615, 645), false);
-  });
-
-  test('T12: 600–660 is identical to the booking → false', () => {
-    expectDecision(makeRequest(600, 660), false);
-  });
-
-  test('T14: 630–690 with no bookings → true', () => {
-    expectDecision(makeRequest(630, 690, { bookings: [] }), true);
-  });
-
-  test('X2: 750–800 is clear of 600–660 but overlaps the second booking 720–780 → false', () => {
-    expectDecision(
-      makeRequest(750, 800, {
-        bookings: [
-          { start: 600, end: 660 },
-          { start: 720, end: 780 },
-        ],
-      }),
-      false,
-    );
-  });
-});
-
-describe('canBook – AC5: decision does not change existing booking data', () => {
-  test('AC5: an Available request leaves the bookings equal to a copy taken before the call', () => {
-    const request = deepFreeze(makeRequest(660, 720));
+  // Checks the exact decision and that the booking data did not change (AC5).
+  function expectDecision(request: BookingRequest, expected: boolean): void {
     const bookingsRef = request.bookings;
-    const copyBefore = [{ start: 600, end: 660 }];
+    const bookingsBefore = request.bookings.map((b) => ({ ...b }));
 
-    const decision = canBook(request);
+    const decision = canBook(deepFreeze(request));
 
-    expect(decision).toBe(true); // the success path is exercised
-    expect(request.bookings).toBe(bookingsRef);
-    expect(request.bookings).toStrictEqual(copyBefore);
+    expect(decision).toBe(expected);
+    expect(request.bookings).toBe(bookingsRef); // same array, not replaced
+    expect(request.bookings).toStrictEqual(bookingsBefore); // same contents
+  }
+
+  describe('canBook – AC1: valid interval inside the day, start after now', () => {
+    test('T02: 540–570 starts exactly at now (540) → false', () => {
+      expectDecision(makeRequest(540, 570), false);
+    });
+
+    test('R01: 541–571 starts one minute after now → true (twin of T02)', () => {
+      expectDecision(makeRequest(541, 571), true);
+    });
+
+    test('T03: 720–720 zero duration → false', () => {
+      expectDecision(makeRequest(720, 720), false);
+    });
+
+    test('T04: 750–720 reversed interval → false', () => {
+      expectDecision(makeRequest(750, 720), false);
+    });
+
+    test('T05: 1380–1441 ends past the end of the day → false', () => {
+      expectDecision(makeRequest(1380, 1441), false);
+    });
+
+    test('R02: 1380–1440 ends exactly at 24:00 → true (twin of T05)', () => {
+      expectDecision(makeRequest(1380, 1440), true);
+    });
+
+    test('X1: 1320–1440 ends exactly at 24:00 and is 120 minutes → true', () => {
+      expectDecision(makeRequest(1320, 1440), true);
+    });
+
+    test('R05: 660–720 with now = 659 → true (decision uses the supplied now)', () => {
+      expectDecision(makeRequest(660, 720, { now: 659 }), true);
+    });
+
+    test('R06: 660–720 with now = 660 → false (start equals the supplied now)', () => {
+      expectDecision(makeRequest(660, 720, { now: 660 }), false);
+    });
   });
-});
-```
 
-**Run command:** `npx vitest run src/booking.test.ts`
+  describe('canBook – AC2: no longer than 120 minutes', () => {
+    test('T06: 720–840 is exactly 120 minutes → true', () => {
+      expectDecision(makeRequest(720, 840), true);
+    });
 
-The file now has 23 tests. I have not run it. I traced each new case through the current `canBook` code by hand, and I expect all 23 to pass. Your run is the real result.
+    test('T07: 720–841 is 121 minutes → false', () => {
+      expectDecision(makeRequest(720, 841), false);
+    });
+  });
 
-**Updated AC mapping:**
+  describe('canBook – AC3: blocked room', () => {
+    test('T13: 660–720 (Available as in T01) but blocked = true → false', () => {
+      expectDecision(makeRequest(660, 720, { blocked: true }), false);
+    });
+  });
 
-| AC | Tests |
-| --- | --- |
-| AC1 | T02, R01, T03, T04, T05, R02, X1, R05, R06 |
-| AC2 | T06, T07, X1 |
-| AC3 | T13 |
-| AC4 | T01, T08, R03, R04, T09, T10, T11, T12, T14, X2 |
-| AC5 (data part) | AC5 test, plus the frozen-data and before/after checks in every test |
-| AC6 | Not covered by unit tests (see section 4) |
+  describe('canBook – AC4: no overlap, touching endpoints allowed', () => {
+    test('T01: 660–720 touches the end of 600–660 → true', () => {
+      expectDecision(makeRequest(660, 720), true);
+    });
 
-## 4. Implementation fixes, kept separate from test repairs
+    test('T08: 570–600 touches the start of 600–660 → true', () => {
+      expectDecision(makeRequest(570, 600), true);
+    });
 
-No failing test supports an implementation fix: the run was 17 of 17 passing. These are open points that need a decision first:
+    test('R03: 659–720 overlaps the booking by one minute at its end → false', () => {
+      expectDecision(makeRequest(659, 720), false);
+    });
 
-1. **AC1 lower bound (possible fix).** AC1 says `0 ≤ start`, but the code checks `start > 0`. This only makes a difference if `now` can be negative, because the code also needs `start > now`. If the team decides a negative `now` is valid input, this test expresses AC1 and would **fail** against the current code:
-   ```ts
-   test('AC1: start = 0 is inside the day when now is earlier → true', () => {
-     expectDecision(makeRequest(0, 30, { now: -1 }), true);
-   });
-   ```
-   The fix would be to change `start > 0` to `start >= 0` in `src/booking.ts`. If `now` is always 0 or more, the case cannot happen, and only the comment or the AC wording needs to match. I did not add the test to the suite, because the case table does not define a negative `now` and I did not want to invent an expectation.
-2. **AC5 (display) and AC6 are not covered.** `canBook` returns only `true` or `false`. It cannot give the reason a request was rejected, which AC6's "understandable validation feedback" needs. Covering this means a design change (for example, returning a reason as well as the decision) plus component or E2E tests at desktop and mobile widths. That is a requirements question, not a bug in the current code.
-3. **The page's real code path.** As flagged before: please confirm that `checkAvailability()` in `src/lib/availability.ts` calls `canBook`. If it keeps its own copy of the rules, none of these tests cover what the page actually runs.
+    test('R04: 541–601 overlaps the booking by one minute at its start → false', () => {
+      expectDecision(makeRequest(541, 601), false);
+    });
+
+    test('T09: 630–690 partially overlaps 600–660 → false', () => {
+      expectDecision(makeRequest(630, 690), false);
+    });
+
+    test('T10: 570–690 contains the whole booking (120 minutes) → false', () => {
+      expectDecision(makeRequest(570, 690), false);
+    });
+
+    test('T11: 615–645 lies inside the booking → false', () => {
+      expectDecision(makeRequest(615, 645), false);
+    });
+
+    test('T12: 600–660 is identical to the booking → false', () => {
+      expectDecision(makeRequest(600, 660), false);
+    });
+
+    test('T14: 630–690 with no bookings → true', () => {
+      expectDecision(makeRequest(630, 690, { bookings: [] }), true);
+    });
+
+    test('X2: 750–800 is clear of 600–660 but overlaps the second booking 720–780 → false', () => {
+      expectDecision(
+        makeRequest(750, 800, {
+          bookings: [
+            { start: 600, end: 660 },
+            { start: 720, end: 780 },
+          ],
+        }),
+        false,
+      );
+    });
+  });
+
+  describe('canBook – AC5: decision does not change existing booking data', () => {
+    test('AC5: an Available request leaves the bookings equal to a copy taken before the call', () => {
+      const request = deepFreeze(makeRequest(660, 720));
+      const bookingsRef = request.bookings;
+      const copyBefore = [{ start: 600, end: 660 }];
+
+      const decision = canBook(request);
+
+      expect(decision).toBe(true); // the success path is exercised
+      expect(request.bookings).toBe(bookingsRef);
+      expect(request.bookings).toStrictEqual(copyBefore);
+    });
+  });
+  ```
+
+  **Run command:** `npx vitest run src/booking.test.ts`
+
+  The file now has 23 tests. I have not run it. I traced each new case through the current `canBook` code by hand, and I expect all 23 to pass. Your run is the real result.
+
+  **Updated AC mapping:**
+
+  | AC | Tests |
+  | --- | --- |
+  | AC1 | T02, R01, T03, T04, T05, R02, X1, R05, R06 |
+  | AC2 | T06, T07, X1 |
+  | AC3 | T13 |
+  | AC4 | T01, T08, R03, R04, T09, T10, T11, T12, T14, X2 |
+  | AC5 (data part) | AC5 test, plus the frozen-data and before/after checks in every test |
+  | AC6 | Not covered by unit tests (see section 4) |
+
+  ## 4. Implementation fixes, kept separate from test repairs
+
+  No failing test supports an implementation fix: the run was 17 of 17 passing. These are open points that need a decision first:
+
+  1. **AC1 lower bound (possible fix).** AC1 says `0 ≤ start`, but the code checks `start > 0`. This only makes a difference if `now` can be negative, because the code also needs `start > now`. If the team decides a negative `now` is valid input, this test expresses AC1 and would **fail** against the current code:
+     ```ts
+     test('AC1: start = 0 is inside the day when now is earlier → true', () => {
+       expectDecision(makeRequest(0, 30, { now: -1 }), true);
+     });
+     ```
+     The fix would be to change `start > 0` to `start >= 0` in `src/booking.ts`. If `now` is always 0 or more, the case cannot happen, and only the comment or the AC wording needs to match. I did not add the test to the suite, because the case table does not define a negative `now` and I did not want to invent an expectation.
+  2. **AC5 (display) and AC6 are not covered.** `canBook` returns only `true` or `false`. It cannot give the reason a request was rejected, which AC6's "understandable validation feedback" needs. Covering this means a design change (for example, returning a reason as well as the decision) plus component or E2E tests at desktop and mobile widths. That is a requirements question, not a bug in the current code.
+  3. **The page's real code path.** As flagged before: please confirm that `checkAvailability()` in `src/lib/availability.ts` calls `canBook`. If it keeps its own copy of the rules, none of these tests cover what the page actually runs.
 ````
 
 **What I took from it.** Accepted: the deep-freeze of the request (W3), the twins R01/R02 (W4), the 1-minute overlaps R03/R04, and the `now` pair R05/R06 (W2). I also dropped the redundant `toHaveLength` (W5). Rejected: W1, moving the fake clock to 23:30. `canBook` takes `now` as a parameter, the lab rules forbid `new Date()` in the suite, and R05/R06 already show that the decision follows the supplied `now`, so I removed the fake timers completely. I also kept my own revision 2 from section 5: the exact `.toBe(true|false)` is written in every test, because the answer's revised file still hides it inside `expectDecision`. Not adopted: the `start = 0, now = -1` test (section 5, row 7). Two slips in the answer itself: W2 names the new pair "R04 and R05", but the file calls it R05/R06. W1 says the fake clock equals `now = 540`, but `2026-01-15T09:00:00.000Z` is 09:00 UTC, which is 14:00 in Almaty, so it only equals 540 on a UTC machine.
@@ -561,7 +563,15 @@ change and after restoring the correct code from section 7. Every test must pass
 is still open, leave its test failing and explain it in 9.1.
 
 ```text
-(paste here)
+
+ RUN  v3.2.7 /home/claude/work/week-07/app
+
+ ✓ src/booking.test.ts (23 tests) 5ms
+
+ Test Files  1 passed (1)
+      Tests  23 passed (23)
+   Start at  22:27:43
+   Duration  299ms (transform 45ms, setup 0ms, collect 43ms, tests 5ms, environment 0ms, prepare 42ms)
 ```
 
 ---
@@ -574,18 +584,38 @@ error does not count as detection.
 
 | Trial | Intentional change | Detected / Survived | Failing test ID(s) | If it survived: why, and what you added |
 | --- | --- | --- | --- | --- |
-| M1 | Reject duration >= 120 instead of > 120 | Detected / Survived | | |
-| M2 | Treat touching endpoints as an overlap | Detected / Survived | | |
-| M3 | Remove the blocked-room rejection | Detected / Survived | | |
+| M1 | Reject duration >= 120 instead of > 120 | Detected | T06, X1 | (not a survivor) the first suite also caught it with T06 and X1 |
+| M2 | Treat touching endpoints as an overlap | Detected | T01, T08, AC5 (and R05) | (not a survivor) AC5 fails because its Available request is the touching 660–720; R05 uses the same interval |
+| M3 | Remove the blocked-room rejection | Detected | T13 | (not a survivor) only T13 sets blocked = true, so it is the single guard for AC3 |
 
 **The run of each mutant, pasted unedited.** Paste the `Tests` summary line and the failing test
 names at least:
 
+The `--- M…` lines are my labels for which change was in place. The other lines are the run output, filtered with `grep` to the RUN line, the FAIL lines and the summary lines (`NO_COLOR=1 npx vitest run | grep -E "RUN  v| FAIL |Test Files|      Tests"`). The code was restored after each run, and `diff` against the saved original was empty.
+
 ```text
-(paste here)
+--- M1: src/booking.ts line 'end - start > MAX_BOOKING_MINUTES' changed to '>='
+ RUN  v3.2.7 /home/claude/work/week-07/app
+ FAIL  src/booking.test.ts > AC1: valid interval inside the day, start after the supplied now > X1 AC1 AC2: 1320–1440 ends at 24:00 and lasts exactly 120 minutes, accepted
+ FAIL  src/booking.test.ts > AC2: no longer than 120 minutes > T06 AC2: 720–840, exactly 120 minutes, is accepted
+ Test Files  1 failed (1)
+      Tests  2 failed | 21 passed (23)
+--- M2: overlap test changed to 'start <= b.end && end >= b.start'
+ RUN  v3.2.7 /home/claude/work/week-07/app
+ FAIL  src/booking.test.ts > AC1: valid interval inside the day, start after the supplied now > R05 AC1: 660–720 with now = 659 is accepted (the supplied now is used)
+ FAIL  src/booking.test.ts > AC4: no overlap, touching endpoints allowed > T01 AC4: 660–720 touching the end of 600–660 is accepted
+ FAIL  src/booking.test.ts > AC4: no overlap, touching endpoints allowed > T08 AC4: 570–600 touching the start of 600–660 is accepted
+ FAIL  src/booking.test.ts > AC5: the decision does not change the existing booking data > AC5: an Available request leaves the bookings equal to a copy taken before the call
+ Test Files  1 failed (1)
+      Tests  4 failed | 19 passed (23)
+--- M3: line 'if (blocked) return false;' removed
+ RUN  v3.2.7 /home/claude/work/week-07/app
+ FAIL  src/booking.test.ts > AC3: blocked room > T13 AC3: 660–720 in a blocked room is rejected
+ Test Files  1 failed (1)
+      Tests  1 failed | 22 passed (23)
 ```
 
-All three changes reverted, and the full suite run again (section 6.3): yes / no
+All three changes reverted, and the full suite run again (section 6.3): yes
 
 ---
 
@@ -597,11 +627,11 @@ screenshot of each as `evidence/ui-1.png` … `evidence/ui-5.png`. Take **ui-4 a
 
 | # | Action | Expected observation | AC | What I observed | Pass / Fail / Not testable |
 | --- | --- | --- | --- | --- | --- |
-| U1 | Check 11:00–12:00, unblocked | Available, with the fixed sample booking | AC5 | | Pass / Fail / Not testable |
-| U2 | Enable blocked, then check again | Unavailable replaces the earlier result | AC3, AC5 | | Pass / Fail / Not testable |
-| U3 | Clear a required input and submit | Understandable validation feedback | AC6 | | Pass / Fail / Not testable |
-| U4 | Use a narrow (phone) width | Controls and result remain usable | AC6 | | Pass / Fail / Not testable |
-| U5 | Repeat the checks on the same data | Existing bookings remain unchanged | AC5 | | Pass / Fail / Not testable |
+| U1 | Check 11:00–12:00, unblocked | Available, with the fixed sample booking | AC5 | Turing Lecture 305 (its only booking is Algorithms 201, 10:00–11:00), current time typed as 09:00, 11:00–12:00: green **Available**, "Available for 60 min (11:00–12:00)." The booking list still shows the one 10:00–11:00 booking (`ui-1.png`) | Pass |
+| U2 | Enable blocked, then check again | Unavailable replaces the earlier result | AC3, AC5 | ticked "Treat this room as blocked" without touching the times: the card changed in place to red **Unavailable** "Room is blocked.", the room badge turned Blocked, and the booking list was unchanged (`ui-2.png`) | Pass |
+| U3 | Clear a required input and submit | Understandable validation feedback | AC6 | cleared End: the decision card is replaced by "Enter a start and end time to see the availability decision." (`ui-3.png`). That is understandable for an empty field, but it does not say *which* field. Typing an invalid `12` gives the same neutral text, with no format error | Pass |
+| U4 | Use a narrow (phone) width | Controls and result remain usable | AC6 | 375 px viewport, phone mode (`ui-4.png`, 750×1624 at 2×): fields stack in one column, the Available card and the booking list are readable, and there is no horizontal scroll (page width = 375). The room list comes first, so the checker is below the fold on a phone | Pass |
+| U5 | Repeat the checks on the same data | Existing bookings remain unchanged | AC5 | repeated U1 → U2 → U3 plus an overlapping 10:30–11:30 check twice on the same page without reloading, then U1 again: still Available, and the list still holds exactly one booking, Algorithms 201 10:00–11:00 (`ui-5.png`, the checker panel) | Pass |
 
 ---
 
@@ -613,17 +643,17 @@ Use the same IDs as `known_fails` in `submission.yml`. Write `none` if the run i
 
 | Check | Why it stays |
 | --- | --- |
-| | |
+| none | |
 
 ### 9.2 Original and improved suites
 
 | Measure | First suite | Improved suite |
 | --- | --- | --- |
-| Executed / passed / failed | | |
-| Requirements with meaningful tests (AC IDs and gaps) | | |
-| Selected mutants detected | | |
-| Accepted / revised / rejected tests | | |
-| Remaining limitations | | |
+| Executed / passed / failed | 17 / 17 / 0 | 23 / 23 / 0 |
+| Requirements with meaningful tests (AC IDs and gaps) | AC1–AC5 had the right cases with correct expected values, but every decision was asserted only inside a helper, and the AC5 "before" copy was a retyped literal. All tests used `now = 540`. AC6 had no test | AC1 (+R01, R02, R05, R06), AC2, AC3, AC4 (+R03, R04), and AC5 with a JSON copy plus a deep-freeze on every call. Exact `.toBe` in every test, no fake clock. Gap: AC6 and the display part of AC5 are covered only by the manual checks U1–U5 |
+| Selected mutants detected | 3 / 3 (M1: T06, X1; M2: T01, T08, AC5; M3: T13): I ran the same three changes against the first suite too | 3 / 3 (M1: T06, X1; M2: T01, T08, AC5, R05; M3: T13) |
+| Accepted / revised / rejected tests | (the assistant's 17) | 16 test cases accepted in content (expected values and inputs unchanged); all 17 revised in form (visible `.toBe`, frozen data); the fake-clock setup revised away; 6 added (R01–R06); 1 proposed test rejected (start = 0 with now = −1) |
+| Remaining limitations | fake clock in the suite; hidden assertions; no 1-minute overlap or `now` variation; mutants M1–M3 caught anyway | `start > 0` in the code vs `0 ≤ start` in AC1 is untested (only reachable with `now < 0`); invalid existing bookings are unspecified (9.3); M3 is guarded by a single test (T13); validation messages and layout are checked by hand only |
 
 ### 9.3 What no AC decides
 
@@ -631,7 +661,9 @@ Call your function with `bookings = [{ start: 700, end: 650 }]` (a reversed exis
 and a request of 660–720. What does it return? Does any AC say what it should return? (This is
 the value you declare in `submission.yml` under `assumptions.invalid_existing_booking`.)
 
--
+- **What it returns:** `true` (Available). I checked it with a one-off Vitest run: `canBook({ start: 660, end: 720, now: 540, blocked: false, bookings: [{ start: 700, end: 650 }] })` printed `true`.
+- **Why:** the overlap test is `start < b.end && end > b.start`. With `b.end = 650`, `660 < 650` is false, so the reversed booking never counts as an overlap, even though a booking "from 650 to 700" would overlap 660–720. The function trusts the existing data and never validates it.
+- **Does an AC decide it?** No. AC1 validates the *candidate* interval only, and AC4 says "overlaps an existing booking" without saying what a reversed existing booking means. I find `true` defensible for this scope, because the bookings are fixed sample data that the page never edits (AC5), so a reversed booking cannot appear unless someone breaks `rooms.ts`. If bookings ever came from users or a database, I would reject invalid stored bookings when they are loaded, not inside `canBook`.
 
 ---
 

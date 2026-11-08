@@ -30,7 +30,13 @@ export default function App() {
   const [roomId, setRoomId] = useState<string>(rooms[0].id);
   const [startInput, setStartInput] = useState('');
   const [endInput, setEndInput] = useState('');
-  const [now, setNow] = useState<number>(nowInMinutes());
+  // Current time: the real clock by default, but the user can type one (HH:MM)
+  // so the decision can be checked for a fixed "now" (Practice #07, Task 7).
+  const [nowInput, setNowInput] = useState<string>(formatTime(nowInMinutes()));
+  const now = parseTime(nowInput) ?? nowInMinutes();
+  // Rooms the user marks as blocked for this check. Page state only:
+  // SAMPLE_ROOMS and the booking data are never changed (AC5).
+  const [blockedIds, setBlockedIds] = useState<string[]>([]);
 
   const selectedRoom = useMemo(
     () => rooms.find((r) => r.id === roomId) ?? rooms[0],
@@ -40,19 +46,21 @@ export default function App() {
   const start = parseTime(startInput);
   const end = parseTime(endInput);
 
+  const blocked = selectedRoom.blocked || blockedIds.includes(selectedRoom.id);
+
   const decision = useMemo(() => {
     if (start === null || end === null) return null;
     const request = {
       start,
       end,
       now,
-      blocked: selectedRoom.blocked,
+      blocked,
       bookings: selectedRoom.bookings,
     };
     // The decision comes from canBook (src/booking.ts); the page only words it.
     const available = canBook(request);
     return describeDecision(available, request);
-  }, [selectedRoom, start, end, now]);
+  }, [selectedRoom, start, end, now, blocked]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -64,6 +72,7 @@ export default function App() {
             rooms={rooms}
             selectedId={selectedRoom.id}
             onSelect={setRoomId}
+            blockedIds={blockedIds}
             now={now}
           />
           <Checker
@@ -73,7 +82,18 @@ export default function App() {
             onStart={setStartInput}
             onEnd={setEndInput}
             now={now}
-            onResetNow={() => setNow(nowInMinutes())}
+            nowInput={nowInput}
+            onNowInput={setNowInput}
+            onResetNow={() => setNowInput(formatTime(nowInMinutes()))}
+            blocked={blocked}
+            fixedBlocked={selectedRoom.blocked}
+            onBlocked={(on) =>
+              setBlockedIds((ids) =>
+                on
+                  ? [...ids, selectedRoom.id]
+                  : ids.filter((id) => id !== selectedRoom.id),
+              )
+            }
             decision={decision}
           />
         </div>
@@ -110,11 +130,13 @@ function RoomList({
   rooms,
   selectedId,
   onSelect,
+  blockedIds,
   now,
 }: {
   rooms: Room[];
   selectedId: string;
   onSelect: (id: string) => void;
+  blockedIds: string[];
   now: number;
 }) {
   return (
@@ -150,7 +172,7 @@ function RoomList({
                       </span>
                     </div>
                   </div>
-                  {room.blocked ? (
+                  {room.blocked || blockedIds.includes(room.id) ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
                       <Ban className="h-3 w-3" />
                       Blocked
@@ -207,7 +229,12 @@ function Checker({
   onStart,
   onEnd,
   now,
+  nowInput,
+  onNowInput,
   onResetNow,
+  blocked,
+  fixedBlocked,
+  onBlocked,
   decision,
 }: {
   room: Room;
@@ -216,7 +243,12 @@ function Checker({
   onStart: (v: string) => void;
   onEnd: (v: string) => void;
   now: number;
+  nowInput: string;
+  onNowInput: (v: string) => void;
   onResetNow: () => void;
+  blocked: boolean;
+  fixedBlocked: boolean;
+  onBlocked: (on: boolean) => void;
   decision: ReturnType<typeof describeDecision> | null;
 }) {
   return (
@@ -226,12 +258,18 @@ function Checker({
       </h2>
       <p className="mt-1 text-lg font-medium text-slate-900">{room.name}</p>
 
-      <div className="mt-4 flex items-center gap-2 text-sm text-slate-600">
+      <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-slate-600">
         <Clock className="h-4 w-4" />
-        <span>
-          Current time:{' '}
-          <span className="font-medium text-slate-900">{formatTime(now)}</span>
-        </span>
+        <label htmlFor="now-input">Current time (HH:MM):</label>
+        <input
+          id="now-input"
+          type="text"
+          inputMode="numeric"
+          value={nowInput}
+          onChange={(e) => onNowInput(e.target.value)}
+          className="w-20 rounded-md border border-slate-300 px-2 py-0.5 text-sm font-medium text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+        />
+        <span className="text-xs text-slate-500">using {formatTime(now)}</span>
         <button
           type="button"
           onClick={onResetNow}
@@ -240,6 +278,17 @@ function Checker({
           Update now
         </button>
       </div>
+
+      <label className="mt-3 inline-flex items-center gap-2 text-sm text-slate-700">
+        <input
+          type="checkbox"
+          checked={blocked}
+          disabled={fixedBlocked}
+          onChange={(e) => onBlocked(e.target.checked)}
+          className="h-4 w-4 rounded border-slate-300"
+        />
+        Treat this room as blocked
+      </label>
 
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <TimeField
@@ -293,7 +342,7 @@ function Checker({
             ))}
           </ul>
         )}
-        {room.blocked && (
+        {blocked && (
           <p className="mt-2 inline-flex items-center gap-1 text-xs text-red-600">
             <Ban className="h-3.5 w-3.5" />
             This room is blocked and cannot be booked.
