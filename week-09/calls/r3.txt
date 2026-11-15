@@ -1,0 +1,1 @@
+Which time range do you want (for example 13:00 to 15:00), what is the current time, is the room blocked, and what bookings already exist for that day?
