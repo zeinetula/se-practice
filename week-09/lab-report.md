@@ -201,22 +201,20 @@ PASS  S09   blocked as a string: "false" -> refuse
 PASS  S10   start not a whole minute: 600.5 -> refuse
 PASS  S11   end at the end of the day: 1440 -> accept
 PASS  S12   a booking as a pair: [660, 720] -> refuse
-PASS  F1    calls/r1.json: a call to check_room
-PASS  F2    calls/r1.json: arguments valid against your schema
-PASS  F3    calls/r1.json: arguments equal the expected ones (README section 5, Part 2)
-PASS  F4    calls/r2.json: a call to check_room
-PASS  F5    calls/r2.json: arguments valid against your schema
-PASS  F6    calls/r2.json: arguments equal the expected ones (README section 5, Part 2)
+PASS  F1    calls\r1.json: a call to check_room
+PASS  F2    calls\r1.json: arguments valid against your schema
+PASS  F3    calls\r1.json: arguments equal the expected ones (README section 5, Part 2)
+PASS  F4    calls\r2.json: a call to check_room
+PASS  F5    calls\r2.json: arguments valid against your schema
+PASS  F6    calls\r2.json: arguments equal the expected ones (README section 5, Part 2)
 PASS  F7    calls/r3: exactly one of r3.json (it called) or r3.txt (it asked), not empty
 PASS  L1    section 5 names at least two acceptance criteria (AC1-AC6) the schema cannot check
 PASS  L2    section 6: A1-A8 each have allow / ask / block and a reason of 5+ words
-FAIL  L3    section 7 names the checkpoint commit (a SHA)
-             -> no 7-40 character commit hash in section 7
-FAIL  L4    section 10: a conclusion of 80-150 words
-             -> 0 words
+PASS  L3    section 7 names the checkpoint commit (a SHA)
+PASS  L4    section 10: a conclusion of 80-150 words
 PASS  L5    AI_USAGE.md filled in (a tool row, and signed)
 
-SUMMARY: 28 PASS · 2 FAIL · 0 ERROR  (of 30 checks)
+SUMMARY: 30 PASS · 0 FAIL · 0 ERROR  (of 30 checks)
 Paste this whole output into lab-report.md section 8, and these three numbers into submission.yml.
 ```
 
