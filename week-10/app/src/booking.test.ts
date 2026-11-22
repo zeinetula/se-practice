@@ -185,3 +185,17 @@ describe('Week 08 regressions: the provided buggy canBook', () => {
     expect(request.bookings).toEqual(before);
   });
 });
+
+// Week 10 regression tests for R4 (lab-report.md section 4.1): canBook must not call a room free
+// when the booking data it is given is malformed. Written before the fix; they must fail first.
+describe('Week 10 regressions: malformed booking data (R4)', () => {
+  test('R4 AC4: a booking with NaN bounds makes the request Unavailable, not Available', () => {
+    const request = makeRequest(660, 720, { bookings: [{ start: NaN, end: 700 }] });
+    expect(canBook(request)).toBe(false);
+  });
+
+  test('R4 AC4: a reversed booking (start 700, end 600) makes the request Unavailable', () => {
+    const request = makeRequest(650, 660, { bookings: [{ start: 700, end: 600 }] });
+    expect(canBook(request)).toBe(false);
+  });
+});
