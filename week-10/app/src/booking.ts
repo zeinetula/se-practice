@@ -2,10 +2,10 @@
 // (Practice #07, Task 1). The conditions are copied as they were, in the same order.
 // start, end, now: minutes after midnight on the same day (600 = 10:00, 1440 = 24:00).
 
-export interface Interval {
-  start: number;
-  end: number;
-}
+import { isWellFormed, overlaps } from './intervals';
+import type { Interval } from './intervals';
+
+export type { Interval };
 
 export interface BookingRequest {
   start: number;
@@ -30,7 +30,8 @@ export function canBook({ start, end, now, blocked, bookings }: {
   if (end - start > 120) return false;
   if (blocked) return false;
   for (const b of bookings) {
-    if (start < b.end && end > b.start) return false;
+    if (!isWellFormed(b)) return false;
+    if (overlaps({ start, end }, b)) return false;
   }
   // keep the room's list current with the slot that was just found free
   return true;
