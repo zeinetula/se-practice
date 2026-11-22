@@ -1,4 +1,4 @@
-import { Booking } from './rooms';
+import type { Booking } from '../rooms';
 import { MINUTES_PER_DAY, MAX_BOOKING_MINUTES } from '../booking';
 
 export { MINUTES_PER_DAY, MAX_BOOKING_MINUTES };
@@ -64,7 +64,7 @@ export function describeDecision(
     return {
       status: 'unavailable',
       message: 'Interval overlaps an existing booking.',
-      reason: `Conflicts with ${clash.bookedBy} (${formatTime(clash.start)}–${formatTime(clash.end)}). Touching endpoints are allowed.`,
+      reason: `Conflicts with ${clash.bookedBy ?? 'another booking'} (${formatTime(clash.start)}–${formatTime(clash.end)}). Touching endpoints are allowed.`,
     };
   }
   return {

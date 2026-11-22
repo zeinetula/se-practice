@@ -9,9 +9,11 @@ import {
   CalendarClock,
   Building2,
   Ban,
+  SearchX,
 } from 'lucide-react';
-import { SAMPLE_ROOMS, Room } from '@/lib/rooms';
-import { canBook } from './booking';
+import { ROOMS, EQUIPMENT, Room } from './rooms';
+import { checkRoom } from './booking';
+import { filterRooms } from './filter';
 import {
   describeDecision,
   formatTime,
@@ -26,7 +28,7 @@ function nowInMinutes(): number {
 }
 
 export default function App() {
-  const [rooms] = useState<Room[]>(SAMPLE_ROOMS);
+  const [rooms] = useState<Room[]>(ROOMS);
   const [roomId, setRoomId] = useState<string>(rooms[0].id);
   const [startInput, setStartInput] = useState('');
   const [endInput, setEndInput] = useState('');
@@ -35,32 +37,43 @@ export default function App() {
   const [nowInput, setNowInput] = useState<string>(formatTime(nowInMinutes()));
   const now = parseTime(nowInput) ?? nowInMinutes();
   // Rooms the user marks as blocked for this check. Page state only:
-  // SAMPLE_ROOMS and the booking data are never changed (AC5).
+  // ROOMS and the booking data are never changed (AC5).
   const [blockedIds, setBlockedIds] = useState<string[]>([]);
+  // Room filter (F1, F2).
+  const [attendeesInput, setAttendeesInput] = useState('');
+  const [equipment, setEquipment] = useState<string[]>([]);
 
-  const selectedRoom = useMemo(
-    () => rooms.find((r) => r.id === roomId) ?? rooms[0],
-    [rooms, roomId],
+  // The catalog as the page sees it: ROOMS with the "treat as blocked" marks applied.
+  const catalog = useMemo(
+    () => rooms.map((r) => (blockedIds.includes(r.id) ? { ...r, blocked: true } : r)),
+    [rooms, blockedIds],
   );
+
+  const visibleRooms = useMemo(
+    () => filterRooms(catalog, { attendees: Number(attendeesInput) || 0, equipment }),
+    [catalog, attendeesInput, equipment],
+  );
+
+  // F5: the result is derived from the selected room on every render, so changing
+  // the room (or the filter that hides it) always refreshes it.
+  const selectedRoom = visibleRooms.find((r) => r.id === roomId) ?? visibleRooms[0] ?? null;
 
   const start = parseTime(startInput);
   const end = parseTime(endInput);
 
-  const blocked = selectedRoom.blocked || blockedIds.includes(selectedRoom.id);
-
   const decision = useMemo(() => {
-    if (start === null || end === null) return null;
+    if (!selectedRoom || start === null || end === null) return null;
     const request = {
       start,
       end,
       now,
-      blocked,
+      blocked: selectedRoom.blocked,
       bookings: selectedRoom.bookings,
     };
-    // The decision comes from canBook (src/booking.ts); the page only words it.
-    const available = canBook(request);
+    // The decision comes from checkRoom (src/booking.ts); the page only words it.
+    const available = checkRoom(catalog, selectedRoom.id, { start, end, now });
     return describeDecision(available, request);
-  }, [selectedRoom, start, end, now, blocked]);
+  }, [catalog, selectedRoom, start, end, now]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -68,39 +81,139 @@ export default function App() {
 
       <main className="mx-auto max-w-6xl px-4 pb-16 sm:px-6 lg:px-8">
         <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
-          <RoomList
-            rooms={rooms}
-            selectedId={selectedRoom.id}
-            onSelect={setRoomId}
-            blockedIds={blockedIds}
-            now={now}
-          />
-          <Checker
-            room={selectedRoom}
-            startInput={startInput}
-            endInput={endInput}
-            onStart={setStartInput}
-            onEnd={setEndInput}
-            now={now}
-            nowInput={nowInput}
-            onNowInput={setNowInput}
-            onResetNow={() => setNowInput(formatTime(nowInMinutes()))}
-            blocked={blocked}
-            fixedBlocked={selectedRoom.blocked}
-            onBlocked={(on) =>
-              setBlockedIds((ids) =>
-                on
-                  ? [...ids, selectedRoom.id]
-                  : ids.filter((id) => id !== selectedRoom.id),
-              )
-            }
-            decision={decision}
-          />
+          <div className="space-y-4">
+            <FilterPanel
+              attendeesInput={attendeesInput}
+              onAttendees={setAttendeesInput}
+              equipment={equipment}
+              onEquipment={setEquipment}
+              shown={visibleRooms.length}
+              total={rooms.length}
+            />
+            <RoomList
+              rooms={visibleRooms}
+              selectedId={selectedRoom?.id ?? ''}
+              onSelect={setRoomId}
+              blockedIds={blockedIds}
+              now={now}
+            />
+          </div>
+          {selectedRoom ? (
+            <Checker
+              room={selectedRoom}
+              startInput={startInput}
+              endInput={endInput}
+              onStart={setStartInput}
+              onEnd={setEndInput}
+              now={now}
+              nowInput={nowInput}
+              onNowInput={setNowInput}
+              onResetNow={() => setNowInput(formatTime(nowInMinutes()))}
+              blocked={selectedRoom.blocked}
+              fixedBlocked={rooms.find((r) => r.id === selectedRoom.id)?.blocked ?? false}
+              onBlocked={(on) =>
+                setBlockedIds((ids) =>
+                  on
+                    ? [...ids, selectedRoom.id]
+                    : ids.filter((id) => id !== selectedRoom.id),
+                )
+              }
+              decision={decision}
+            />
+          ) : (
+            <NoRoomSelected />
+          )}
         </div>
 
         <Rules />
       </main>
     </div>
+  );
+}
+
+function FilterPanel({
+  attendeesInput,
+  onAttendees,
+  equipment,
+  onEquipment,
+  shown,
+  total,
+}: {
+  attendeesInput: string;
+  onAttendees: (v: string) => void;
+  equipment: string[];
+  onEquipment: (items: string[]) => void;
+  shown: number;
+  total: number;
+}) {
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+        Find a room
+      </h2>
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium text-slate-600">
+          Attendees (minimum capacity)
+        </span>
+        <input
+          type="number"
+          min={0}
+          inputMode="numeric"
+          value={attendeesInput}
+          placeholder="e.g. 10"
+          onChange={(e) => onAttendees(e.target.value)}
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+        />
+      </label>
+      <fieldset className="mt-3">
+        <legend className="mb-1 text-xs font-medium text-slate-600">
+          Required equipment (the room must have all selected)
+        </legend>
+        <div className="flex flex-wrap gap-2">
+          {EQUIPMENT.map((item) => {
+            const on = equipment.includes(item);
+            return (
+              <label
+                key={item}
+                className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${
+                  on
+                    ? 'border-blue-600 bg-blue-50 text-blue-800'
+                    : 'border-slate-200 bg-white text-slate-600'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={on}
+                  onChange={(e) =>
+                    onEquipment(
+                      e.target.checked
+                        ? [...equipment, item]
+                        : equipment.filter((x) => x !== item),
+                    )
+                  }
+                  className="h-3.5 w-3.5"
+                />
+                {item}
+              </label>
+            );
+          })}
+        </div>
+      </fieldset>
+      <p className="mt-3 text-xs text-slate-500" aria-live="polite">
+        Showing {shown} of {total} rooms.
+      </p>
+    </section>
+  );
+}
+
+function NoRoomSelected() {
+  return (
+    <section className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+        Check availability
+      </h2>
+      <p className="mt-2">No room is selected. Change the filter to see rooms.</p>
+    </section>
   );
 }
 
@@ -144,6 +257,15 @@ function RoomList({
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
         Rooms
       </h2>
+      {rooms.length === 0 && (
+        <div
+          role="status"
+          className="flex items-start gap-2 rounded-xl border border-dashed border-amber-300 bg-amber-50 p-4 text-sm text-amber-800"
+        >
+          <SearchX className="mt-0.5 h-4 w-4 flex-none" />
+          <span>No rooms match. Lower the number of attendees or remove some equipment.</span>
+        </div>
+      )}
       <ul className="space-y-2">
         {rooms.map((room) => {
           const active = room.id === selectedId;
@@ -171,6 +293,9 @@ function RoomList({
                         {room.capacity}
                       </span>
                     </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {room.equipment.join(', ')}
+                    </p>
                   </div>
                   {room.blocked || blockedIds.includes(room.id) ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
@@ -201,10 +326,10 @@ function Timeline({ room, now }: { room: Room; now: number }) {
       <div className="relative h-2 w-full rounded-full bg-slate-100">
         {room.bookings.map((b) => (
           <div
-            key={b.id}
+            key={b.id ?? `${b.start}-${b.end}`}
             className="absolute top-0 h-2 rounded-full bg-blue-400"
             style={{ left: pct(b.start), width: pct(b.end - b.start) }}
-            title={`${formatTime(b.start)}–${formatTime(b.end)} · ${b.bookedBy}`}
+            title={`${formatTime(b.start)}–${formatTime(b.end)} · ${b.bookedBy ?? 'Booked'}`}
           />
         ))}
         <div
@@ -328,12 +453,12 @@ function Checker({
           <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">
             {room.bookings.map((b) => (
               <li
-                key={b.id}
+                key={b.id ?? `${b.start}-${b.end}`}
                 className="flex items-center justify-between px-3 py-2 text-sm"
               >
                 <span className="inline-flex items-center gap-2 text-slate-700">
                   <DoorClosed className="h-4 w-4 text-slate-400" />
-                  {b.bookedBy}
+                  {b.bookedBy ?? 'Booked'}
                 </span>
                 <span className="font-mono text-xs text-slate-500">
                   {formatTime(b.start)}–{formatTime(b.end)}
