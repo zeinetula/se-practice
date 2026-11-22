@@ -1,0 +1,73 @@
+# week-10/submission.yml — your declaration for this lab.
+#
+# Facts only. Every explanation goes in lab-report.md; nothing here repeats prose.
+# Fill every value. Check it before you push:
+#
+#     python tests/validate_submission.py
+#
+# The validator checks shape, never quality. A green run is the floor, not the grade.
+# If you cannot run Python, fill the file by hand against the comments — a malformed
+# file costs you nothing if the content is there.
+
+schema: 1
+week: "10"
+
+student:
+  name: "Ayan Zeinetula"
+  student_id: "24B031804"
+  github: zeinetula
+
+assistant:
+  tool: "Claude"
+  model: "Claude Sonnet 5.5"
+  environment: other
+
+project:
+  starting_point: week-08
+  baseline_commit: "e2b429d"
+  language: ts
+  vitest: "3.2.7"
+
+counts:
+  claims_challenged: 9
+  risks_registered: 7
+  risks_confirmed: 6
+  tests_final: 27
+  agents_lines_changed: 8
+
+audit:
+  level: 1
+
+decision:
+  top_two: [R1, R4]
+  mitigated: [R1, R4]
+  release: conditional
+
+checker:
+  # Numbers from YOUR last run of: python tests/check_audit.py
+  # They must add up to the number of checks it runs (31).
+  # Report them as they came out.
+  # A FAIL you report and explain in lab-report.md costs you nothing extra. A hidden one costs the criterion.
+  pass:                # TODO after the real run: python tests/check_audit.py (expected 31 once TODO-HASH is replaced)
+  fail:
+  error:
+  commit:              # the commit you ran the checker at: git rev-parse --short HEAD
+                       # (normally the commit just before you commit this file — that is fine)
+  known_fails: []
+
+review_findings:
+  # Three or more. One line each, and each one names what it is about: a risk ID (R1...), a
+  # constraint (C1-C6), an AC, a readiness row (1a-3d), or a file.
+  # Worthless:        "The AI found some risks that were not real"
+  # Worth everything: "R3: the AI said canBook mutates bookings; src/booking.ts has no push since the BUG-B fix - unsupported"
+  - "R1: AGENTS.md tells the agent to run npx netlify deploy --prod and to use real KBTU data; provided/AGENTS.md line 38 and the KBTU line - confirmed"
+  - "AGENTS.md: the AI said tests run with npm run test:unit; package.json has no such script (Missing script) - confirmed"
+  - "R4: the AI said a NaN booking makes canBook return Available; a run returned true, fixed by src/intervals.ts - confirmed"
+  - "booking.ts: the AI said availability.ts line 70 needs start > 0; the line is 33, the claim about the rules is right - confirmed with a wrong line number"
+  - "R7: the AI said a build artifact is committed; app/.gitignore lists dist and the folder came from my own build - unsupported"
+
+honesty:
+  review_was_read_only: "yes"
+  agents_patch_approved_by_me: "yes"
+  outputs_unedited: "yes"
+  ai_usage_disclosed: "yes"
