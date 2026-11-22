@@ -1,0 +1,29 @@
+@startuml
+' The modules of the final code (sis-04/app/src).
+package "UI" {
+  component "App.tsx" as App
+  component "components/\nFilterPanel, RoomList, Timeline,\nChecker, DecisionCard, TimeField,\nHeader, Rules" as Components
+  component "lib/messages.ts\n(wording only)" as Messages
+  component "lib/time.ts" as Time
+}
+package "Rules and data" {
+  component "rooms.ts\nROOMS, Room (data)" as Rooms
+  component "filter.ts\nfilterRooms (F1, F2)" as Filter
+  component "booking.ts\ncanBook, checkRoom,\nexplainRejection, whyUnavailable" as Booking
+}
+App --> Components
+App --> Rooms : ROOMS
+App --> Filter : filterRooms()
+App --> Booking : whyUnavailable()
+App --> Messages : describeDecision()
+App --> Time
+Components --> Rooms : EQUIPMENT, Room
+Components --> Booking : MAX_BOOKING_MINUTES
+Components --> Time
+Components --> Messages : Decision
+Messages --> Booking : Rejection
+Messages --> Time
+Time --> Booking : MINUTES_PER_DAY
+Filter ..> Rooms : Room type
+Booking ..> Rooms : Room type
+@enduml

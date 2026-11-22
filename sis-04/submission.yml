@@ -1,0 +1,44 @@
+schema: 1
+assignment: "sis-04"            # do not edit
+
+student:
+  name: "Ayan Zeinetula"
+  student_id: "24B031804"
+  group: "Monday 16:00"
+  github: "zeinetula"
+
+assistant:
+  tool: "Claude.ai Project (Claude Code session)"
+  model: "Claude Sonnet 5.5 (claude-sonnet-5-5)"
+
+project:
+  start_from: "week-07"
+  baseline_commit: "47ad596"
+  language: "ts"
+  vitest: "3.2.7"
+
+counts:
+  rooms: 5
+  tests_original: 23
+  tests_final: 57
+  risks: 5
+  exchanges: 3
+
+checker:
+  pass: 32
+  fail: 1
+  error: 0
+  commit: "99f4fde"
+  known_fails: [L10]
+
+review_findings:
+  - "A6 / canBook: the suggested one-line wrapper over explainRejection would have changed canBook; kept its AC rules and shared three predicates instead (report 3.3)"
+  - "S6 B1-B4: the decide() helper in booking.test.ts hides the canBook call from the checker, so B1-B4 were written as checkRoom tests in room.test.ts"
+  - "src/lib/availability.ts: describeDecision repeated the AC1-AC4 conditions of canBook; removed, reasons now come from explainRejection in booking.ts"
+  - "A5 / App.tsx: first version used only whyUnavailable, the checker wanted checkRoom or canBook in the UI; App now decides with checkRoom"
+
+honesty:
+  baseline_unchanged: "yes"
+  runs_unedited: "yes"
+  no_invented_metrics: "yes"
+  ai_usage_disclosed: "yes"
