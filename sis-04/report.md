@@ -107,199 +107,197 @@ This plan is committed before any change to `app/src`. The assistant drafted it 
 
 ### 4.1 What I added
 
-<!-- Short: the catalog (how many rooms, which equipment), how the filter is chosen on the page,
-     what the empty state says, what happens to an old result when the room changes. -->
+The catalog is `src/rooms.ts`: 5 fictional rooms (Hawking Hall 101, Curie Lab 202 which is blocked, Turing Lecture 305, Da Vinci Studio 110, Lovelace Seminar 120), each with id, name, building, capacity, equipment list, blocked flag and its own bookings. Six equipment names are available: drawing-tables, lab-bench, microphone, projector, video-conferencing, whiteboard.
 
-(write here)
+The page has a "Find a room" panel: a number box for attendees (F1) and a checkbox per equipment item (F2, all selected items required). `filterRooms` decides which rooms are listed. When nothing matches, the room list shows "No rooms match. Lower the number of attendees or remove some equipment." and the check panel says no room is selected (F4). Blocked rooms stay in the list with a "Blocked" label and are never reported Available (F3, design decision in 5.2). The result is computed from the selected room on every render with `checkRoom` (and `whyUnavailable` for the reason), so choosing another room replaces the old result immediately (F5); if the filter hides the selected room the first listed room is selected instead.
 
 ### 4.2 Demonstration
 
-<!-- One row per screenshot in evidence/. Say what is on it: the filter values, the rooms shown,
-     the room selected, the times entered and the result. -->
+Current time was set to 09:00 in every screenshot.
 
 | Screenshot | What it shows |
 | --- | --- |
-| `evidence/filter-match.png` | (write here) |
-| `evidence/filter-empty.png` | (write here) |
-| `evidence/switch-a.png` | (write here) |
-| `evidence/switch-b.png` | (write here) |
-| `evidence/narrow.png` | (write here) |
+| `evidence/filter-match.png` | Attendees 10 with projector and whiteboard ticked: "Showing 2 of 5 rooms" and only Hawking Hall 101 (40 seats) and Lovelace Seminar 120 (12 seats), the two rooms with both items. |
+| `evidence/filter-empty.png` | Attendees 200: "Showing 0 of 5 rooms", the amber empty-state message "No rooms match", and the check panel saying no room is selected. |
+| `evidence/switch-a.png` | All 5 rooms, Hawking Hall 101 selected, 10:30 to 11:00 entered: Available for 30 min (its bookings are 09:00-10:00 and 13:00-14:00). |
+| `evidence/switch-b.png` | The same times 10:30 to 11:00 with Turing Lecture 305 selected: Unavailable, "Conflicts with Algorithms 201 (10:00-11:00)", a different result for the same times (F5). |
+| `evidence/narrow.png` | The page at phone width, 390 x 2210 portrait: filter, room list, check form and result stacked in one column, Turing Lecture 305 selected with the same Unavailable result. |
 
 ## 5. Refactoring (Task 3)
 
-<!-- The diagrams are diagrams/before.puml and diagrams/after.puml (README section 8). -->
+The diagrams are `diagrams/before.puml` and `diagrams/after.puml`.
 
 ### 5.1 Module responsibilities after
 
 | Module or component | Responsibility |
 | --- | --- |
-| `src/rooms.ts` | (write here) |
-| `src/booking.ts` | (write here) |
-| `src/filter.ts` | (write here) |
-| (write here) | (write here) |
+| `src/rooms.ts` | The catalog: `Room` type, `ROOMS` (5 rooms), `EQUIPMENT`. Data only. |
+| `src/booking.ts` | The rules: `canBook` (AC1-AC5), `checkRoom` (F3, F5), `explainRejection` and `whyUnavailable` (the reason behind a no). |
+| `src/filter.ts` | `filterRooms`: F1 capacity and F2 equipment. |
+| `src/App.tsx` | The page: keeps what the user typed, calls the modules above, composes the components. No rule of its own. |
+| `src/components/*.tsx` | Presentation only: Header, FilterPanel, RoomList, Timeline, Checker, DecisionCard, TimeField, Rules. |
+| `src/lib/messages.ts` | The wording of a result: maps a rejection reason to text; compares nothing. |
+| `src/lib/time.ts` | `formatTime`, `formatRange`, `parseTime`, `nowInMinutes`. |
 
 ### 5.2 Design decisions
 
-<!-- At least two. The alternative is what you could have done instead (often what the assistant
-     proposed). The why names an AC, an F-rule, a test or a risk from 3.1. -->
-
 | Decision | Alternative I did not take | Why |
 | --- | --- | --- |
-| (write here) | (write here) | (write here) |
-| (write here) | (write here) | (write here) |
+| The reason for a "no" is computed in `booking.ts` (`explainRejection`) and `lib/messages.ts` only maps reasons to text. | Keep `describeDecision` in the UI and make it repeat the AC1-AC4 conditions, as it did (risk 1). | One place to change a rule; the page cannot say a reason the rules did not give. The `rejection.test.ts` grid test also checks that `explainRejection` is null exactly when `canBook` is true. |
+| Blocked rooms stay in the filtered list with a "Blocked" label; `filterRooms` does not look at `blocked`. | Hide blocked rooms inside `filterRooms`. | F1 and F2 are about capacity and equipment only; F3 is the job of `checkRoom`. Showing the room with its label and the reason "Room is blocked" is clearer feedback (AC6) than a room that silently vanishes, and `filterRooms` stays one rule per line. |
+| `checkRoom(rooms, roomId, request)` takes the whole catalog and looks the room up by id. | Pass the page's selected room object to `canBook` from `App()`, as before. | The README signature, and it lets the F5 tests prove that the result uses the chosen room's bookings (room d busy at 720-780 does not affect room a). |
 
 ### 5.3 Duplication removed
 
-<!-- One row per duplicated location that is gone. Count what you can point at, nothing else. -->
-
 | Before (file / function, what was repeated) | After (where it lives now) |
 | --- | --- |
-| (write here) | (write here) |
+| `src/lib/availability.ts` `describeDecision()` repeated the AC1-AC4 conditions (valid interval, start after now, 120 minutes, blocked, overlap) already in `canBook()` | `src/booking.ts`: `isValidInterval`, `startsAfter`, `isWithinMax` are used by both `canBook` and `explainRejection`; the overlap is found by elimination; `lib/messages.ts` has no comparisons |
+| `src/App.tsx` `App()` line 49 and `RoomList()` line 175 both combined the "treat as blocked" mark with `room.blocked` | One `catalog` value in `App()` applies the mark once; components read `room.blocked` |
+| `formatTime(start)–formatTime(end)` written four times (Timeline title, booking row, "Available" message, clash message) | `formatRange()` in `src/lib/time.ts` |
 
 ## 6. Automated tests (Task 4)
 
 ### 6.1 Test plan
 
-<!-- One row per required ID. A test may carry several IDs in its title,
-     e.g. test('T06 B1 AC2: exactly 120 minutes is available', …) covers B1 and AC2. -->
-
 | ID | Test title (as in the file) | Input → expected |
 | --- | --- | --- |
-| AC1 | (write here) | (write here) |
-| AC2 | (write here) | (write here) |
-| AC3 | (write here) | (write here) |
-| AC4 | (write here) | (write here) |
-| AC5 | (write here) | (write here) |
-| F1 | (write here) | (write here) |
-| F2 | (write here) | (write here) |
-| F3 | (write here) | (write here) |
-| F4 | (write here) | (write here) |
-| F5 | (write here) | (write here) |
-| B1 | (write here) | (write here) |
-| B2 | (write here) | (write here) |
-| B3 | (write here) | (write here) |
-| B4 | (write here) | (write here) |
-| B5 | (write here) | (write here) |
-| B6 | (write here) | (write here) |
-| INT | (write here) | (write here) |
+| AC1 | `T02 AC1: 540–570 starts exactly at now (540) is rejected` (booking.test.ts) | now 540, 540-570 → false |
+| AC2 | `T07 AC2: 720–841, 121 minutes, is rejected` (booking.test.ts) | 720-841 → false |
+| AC3 | `T13 AC3: 660–720 in a blocked room is rejected` (booking.test.ts) | blocked room, 660-720 → false |
+| AC4 | `T01 AC4: 660–720 touching the end of 600–660 is accepted` (booking.test.ts) | booking 600-660, request 660-720 → true |
+| AC5 | `AC5: an Available request leaves the bookings equal to a copy taken before the call` (booking.test.ts) | frozen bookings unchanged, result true |
+| F1 | `F1: 9 attendees keeps the rooms with capacity 12, 20 and 40, and drops the 8-seat room` (filter.test.ts) | 9 attendees → rooms b, c, d |
+| F2 | `F2: projector + whiteboard keeps only the rooms that have both, not the rooms that have either` (filter.test.ts) | projector + whiteboard → rooms b, c |
+| F3 | `F3 AC3: room c is blocked, so 720-780, free of any booking, is rejected` (room.test.ts) | blocked room c, 720-780 → false |
+| F4 | `F4 F1: 50 attendees matches no room and returns an empty list` (filter.test.ts) | 50 attendees → [] |
+| F5 | `F5: the same times 600-660 are rejected in room a (booked) and available in room b (free)` (room.test.ts) | same request: room a false, room b true |
+| B1 | `B1 AC2: exactly 120 minutes (720-840) in room b is available` (room.test.ts) | 720-840 → true |
+| B2 | `B2 AC2: 121 minutes (720-841) in room b is rejected` (room.test.ts) | 720-841 → false |
+| B3 | `B3 AC4: 660-720 touching the end of room a booking 600-660 is available` (room.test.ts) | 660-720 → true |
+| B4 | `B4 AC4: 630-690 overlapping room a booking 600-660 is rejected` (room.test.ts) | 630-690 → false |
+| B5 | `B5 F1: capacity exactly equal to the attendees (12 and 12) includes the room` (filter.test.ts) | 12 attendees → room b included |
+| B6 | `B6 F1: capacity one below the attendees (12 seats, 13 attendees) excludes the room` (filter.test.ts) | 13 attendees → room b excluded |
+| INT | `INT F1 F2 F3 F5: 10 attendees + projector shows b, c, d; at 720-780 only b is available` (room.test.ts) | filterRooms then checkRoom → ['b'] |
+
+Fixed catalogs are inside `filter.test.ts` and `room.test.ts`. The 23 tests of the starting point (T01-T14, R01-R06, X1, X2, AC5) are kept unchanged. `rejection.test.ts` adds 14 tests for the refactoring.
 
 ### 6.2 Commands
 
-<!-- The commands exactly as you typed them, from app/. -->
-
 ```text
-(paste here)
+cd app
+npm install
+npx vitest run
 ```
+
+Before the feature code existed the new test files failed because `./filter` was missing (2 test files failed, 23 original tests passed). After the refactoring's new tests were written and before `explainRejection` existed, 14 tests failed with "explainRejection is not a function". Both red runs were real runs of the commands above.
 
 ### 6.3 Final run
 
-<!-- The REAL output of the full run on your final code. Every test passes, and the number of
-     tests equals what your test files hold (R2). -->
-
 ```text
-(paste here)
+RUN  v3.2.7 /home/claude/work/asm/sis-04/app
+
+ ✓ src/rejection.test.ts (14 tests) 17ms
+ ✓ src/booking.test.ts (23 tests) 18ms
+ ✓ src/room.test.ts (10 tests) 8ms
+ ✓ src/filter.test.ts (10 tests) 9ms
+
+ Test Files  4 passed (4)
+      Tests  57 passed (57)
+   Start at  18:40:42
+   Duration  1.57s (transform 124ms, setup 0ms, collect 192ms, tests 52ms, environment 1ms, prepare 312ms)
 ```
 
 ## 7. Quality evaluation (Task 5)
 
-<!-- Original = your baseline commit. Final = what you submit. "How I obtained it" says how you
-     measured, so someone else could repeat it: "1.1 and 6.3 runs", "counted in 5.3",
-     "git ls-files app/src". Do not invent a metric. Tests: write passed/total, e.g. 19/19. -->
-
 | Measure | Original | Final | How I obtained it |
 | --- | --- | --- | --- |
-| Automated tests passed / total | (write here) | (write here) | (write here) |
-| Duplicated logic locations removed | (write here) | (write here) | (write here) |
-| Code structure: modules and their responsibilities | (write here) | (write here) | (write here) |
-| Remaining limitation | (write here) | (write here) | (write here) |
+| Automated tests passed / total | 23/23 | 57/57 | The `Tests` line of the runs in 1.1 and 6.3 (`npx vitest run`). |
+| Duplicated logic locations removed | 0 | 3 | Counted in the three rows of 5.3, each pointed at in the code before and after. |
+| Code structure: modules and their responsibilities | 8 files under src/ (main, App with 7 components, booking, lib/availability, lib/rooms, booking.test, css, vite-env); rules were in booking.ts and again in lib/availability.ts | 21 files under src/: rooms, booking, filter, App, 8 components, lib/time, lib/messages, 4 test files, main, css, vite-env | `find src -type f` in `app/` at the baseline and at the final code (the same list as `git ls-files app/src`), read against 5.1. |
+| Remaining limitation | The page was only checked by looking at it; one rule on the page. | There is no rendered UI test: the page wiring (selected room falling back to the first listed room when the filter hides it, and the "treat as blocked" toggle in `App()`) is checked only by the screenshots in 4.2, not by a test. | From what was built: the INT test covers `filterRooms` then `checkRoom`, but `@testing-library/react` and jsdom were not added, so `App.tsx` has no automated test. |
 
 ## 8. AI evidence appendix
 
-<!-- At least three exchanges, one ### 8.N block each: the analysis (Task 1), the plan, and at
-     least one implementation, refactoring or test exchange. Copy the block for more.
-     The prompt as you sent it; the output may be cut to the part you used, with "[…]" where
-     you cut. Verified by: the test, run, file or check that confirmed it — not "it looked right". -->
-
 ### 8.1 Exchange 1
 
-**Tool and model:** (write here)
-**Date:** (write here)
-**Purpose:** (write here)
+**Tool and model:** Claude (Claude Code session in my claude.ai Project), Claude Sonnet 5.5 (`claude-sonnet-5-5`)
+**Date:** 2026-11-22
+**Purpose:** Codebase analysis (Task 1): read the starting point and the README and find maintainability risks.
 
 **Prompt:**
 
 ```text
-(paste here)
+SIS #04 - AI-Assisted Software Evolution, Refactoring and Quality Improvement (2 points)
+Smart Campus Room Availability Checker: extend your working app with a room catalog and filters, refactor it into clear modules, keep AC1-AC6, and prove it with tests and measured evidence. The report is Markdown in your repository (sis-04/report.md). [...] STARTING POINT: Your Practice #08 app (recommended), or #07, or your SIS #03 page, or sis-04/starter/. Bring it into sis-04/app/ UNCHANGED (README section 3), run its tests, commit. That commit is your initial version.
 ```
 
 **Output used:**
 
 ```text
-(paste here)
+Risks found in week-07/app: (1) describeDecision() in src/lib/availability.ts re-checks the AC1-AC4 conditions that canBook() already enforces; (2) SAMPLE_ROOMS / the Room type have no equipment, so F2 cannot be expressed; (3) App.tsx is one 453-line file with the blocked-room combination written in App() and in RoomList(); (4) no test chooses a room, so F5 is untested; (5) the same interval text is built in four places.
 ```
 
-**Problems found:** (write here)
-**Changes made:** (write here)
-**Verified by:** (write here)
+**Problems found:** The assistant first read the packaged week-08 file `week-08/buggy/booking.ts`, which is the Practice #08 planted-bug file (touching bookings rejected, `bookings.push`). That is not a starting point for this assignment ("no planted bugs"), and `week-08/app` is not in my working folder. The assistant chose `week-07/app`, which is on disk with its tests.
+**Changes made:** I checked each risk in the code myself (line numbers in 3.1). Starting point declared as week-07.
+**Verified by:** Reading `src/lib/availability.ts` lines 33-62, `src/App.tsx` lines 49 and 175, and `src/lib/rooms.ts`; the baseline run of 23 passing tests in 1.1.
 
 ### 8.2 Exchange 2
 
-**Tool and model:** (write here)
-**Date:** (write here)
-**Purpose:** (write here)
+**Tool and model:** Claude (Claude Code session in my claude.ai Project), Claude Sonnet 5.5 (`claude-sonnet-5-5`)
+**Date:** 2026-11-22
+**Purpose:** The improvement plan (3.2) and the choice of how to remove the duplicated rules without changing `canBook`.
 
 **Prompt:**
 
 ```text
-(paste here)
+(the same single message as 8.1; I sent no separate planning prompt) [...] extend your working app with a room catalog and filters, refactor it into clear modules, keep AC1-AC6, and prove it with tests and measured evidence.
 ```
 
 **Output used:**
 
 ```text
-(paste here)
+Plan: tests first from F1-F5/B1-B6 (fixed catalogs in the test files), see them fail; add rooms.ts, filter.ts, checkRoom; then move the reason behind a "no" into booking.ts and make lib/messages.ts only map reasons to text; split App.tsx into components; run the original 23 tests after every move. Suggestion: make canBook a wrapper over explainRejection.
 ```
 
-**Problems found:** (write here)
-**Changes made:** (write here)
-**Verified by:** (write here)
+**Problems found:** The suggested wrapper would change `canBook`, which the README says is unchanged, and check A6 reads `canBook`'s own body for the strict overlap, the 120-minute limit and `blocked`.
+**Changes made:** Modified the suggestion (3.3): `canBook` keeps its AC comments and uses three shared predicates; `explainRejection` finds the overlap by elimination and finds the clashing booking by asking `canBook` about each booking alone.
+**Verified by:** The 23 original `canBook` tests still pass (57/57 in 6.3); the grid test in `rejection.test.ts` that `explainRejection` is null exactly when `canBook` is true for 162 requests; `python tests/check_sis.py` check A6.
 
 ### 8.3 Exchange 3
 
-**Tool and model:** (write here)
-**Date:** (write here)
-**Purpose:** (write here)
+**Tool and model:** Claude (Claude Code session in my claude.ai Project), Claude Sonnet 5.5 (`claude-sonnet-5-5`)
+**Date:** 2026-11-22
+**Purpose:** Implementation, tests and refactoring (Tasks 2-4): write the tests, the modules, the components and the screenshots.
 
 **Prompt:**
 
 ```text
-(paste here)
+(the same single message as 8.1; the assistant then worked through the plan in 3.2 on a copy of week-07/app in its sandbox) [...] refactor it into clear modules, keep AC1-AC6, and prove it with tests and measured evidence.
 ```
 
 **Output used:**
 
 ```text
-(paste here)
+export function filterRooms(rooms: Room[], criteria: Criteria): Room[] {
+  return rooms.filter((room) => room.capacity >= criteria.attendees && criteria.equipment.every((item) => room.equipment.includes(item)));
+}
+export function checkRoom(rooms: Room[], roomId: string, request: RoomRequest): boolean {
+  const room = rooms.find((r) => r.id === roomId);
+  if (!room) return false;
+  return canBook({ ...request, blocked: room.blocked, bookings: room.bookings });
+}
 ```
 
-**Problems found:** (write here)
-**Changes made:** (write here)
-**Verified by:** (write here)
+**Problems found:** The first version of `App.tsx` called only `whyUnavailable`, and check A5 (the page must use `checkRoom` or `canBook`) failed; the first screenshot of `switch-b` was taken in the middle of a CSS transition and showed the old room highlighted. Reading check S6 in `tests/check_sis.py` showed that the `decide()` helper in `booking.test.ts` hides the `canBook` call from it, so B1-B4 were written as new tests that call `checkRoom` directly.
+**Changes made:** `App.tsx` now decides with `checkRoom` and asks `whyUnavailable` only for the reason; the screenshots were taken again after a 500 ms wait and checked by eye.
+**Verified by:** `npx vitest run` (57/57, 6.3); the two red runs described in 6.2; `python tests/check_sis.py`; looking at all five screenshots.
 
 ## 9. Checker results and known fails
 
-<!-- Every check still FAIL or ERROR in your last run of python tests/check_sis.py, and why.
-     The same IDs go in submission.yml known_fails. None left? Write: none. -->
-
 | Check | Why it still fails |
 | --- | --- |
-| (write here) | (write here) |
+| L10 | Section 10 (my own-words reflection) is not written yet; it has to be written by me, not by the assistant. |
 
 ## 10. AI reflection (Task 6)
-
-<!-- 200–300 words, your own words, no assistant. Answer all five:
-     What context did you provide the AI assistant? Which generated suggestions were useful or
-     incorrect? What did you personally verify? How did tests influence your engineering
-     decisions? What would you improve next? -->
 
 (write here)
