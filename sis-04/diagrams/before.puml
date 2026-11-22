@@ -1,0 +1,17 @@
+@startuml
+' The modules of the starting point (week-07/app): rules and wording are split, but the page holds everything else.
+component "App.tsx\n(page, 6 components, state)" as App
+component "booking.ts\ncanBook (AC1-AC5)" as Booking
+component "lib/availability.ts\ndescribeDecision, formatTime, parseTime" as Availability
+component "lib/rooms.ts\nSAMPLE_ROOMS (no equipment)" as Rooms
+component "booking.test.ts" as Test
+
+App --> Booking : canBook()
+App --> Availability : describeDecision()
+App --> Rooms : SAMPLE_ROOMS
+Availability --> Booking : constants
+Availability --> Rooms : Booking type
+Test --> Booking : canBook()
+note right of Availability : repeats the AC1-AC4 conditions to find the reason
+note bottom of App : blocked checkbox rule and room state live in the page
+@enduml
