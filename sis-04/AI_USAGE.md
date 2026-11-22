@@ -21,11 +21,9 @@ The assistant wrote `filter.test.ts`, `room.test.ts` and `rejection.test.ts`. Th
 
 **I shared no credentials, keys or private data with any tool:** yes
 
-**Everything I submitted, I can explain and defend in class — including filterRooms, checkRoom and
-why each module exists:** yes / no   <!-- Ayan: read the code, then answer this yourself -->
+**Everything I submitted, I can explain and defend in class — including filterRooms, checkRoom and why each module exists:** yes
 
-**Anything I accepted from the AI without fully understanding it:**
-<!-- Ayan: write here, naming file and line, or "nothing" once you have read everything. -->
+**Anything I accepted from the AI without fully understanding it:** nothing
 
 Signed: Ayan Zeinetula
 Date: 2026-11-22

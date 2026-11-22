@@ -300,4 +300,4 @@ export function checkRoom(rooms: Room[], roomId: string, request: RoomRequest): 
 
 ## 10. AI reflection (Task 6)
 
-(write here)
+своим текстом на 200–300 слов, с четырьмя исправлениями из моего разбора. Если хочешь, пришли черновик сюда, я проверю.
